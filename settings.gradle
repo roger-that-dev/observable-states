@@ -1,2 +1,4 @@
 include 'cordapp'
-include 'cordapp-contracts-states'
+include 'common'
+include 'shared'
+

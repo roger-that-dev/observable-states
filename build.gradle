@@ -1,5 +1,5 @@
 buildscript {
-    ext.corda_release_version = '1.0.0'
+    ext.corda_release_version = '2.0.0'
     ext.corda_gradle_plugins_version = '1.0.0'
     ext.kotlin_version = '1.1.4'
     ext.junit_version = '4.12'
@@ -75,8 +75,9 @@ dependencies {
     // CorDapp dependencies
     // Specify your CorDapp's dependencies below, including dependent CorDapps.
     // We've defined Cash as a dependent CorDapp as an example.
+    cordapp project(":common")
+    cordapp project(":shared")
     cordapp project(":cordapp")
-    cordapp project(":cordapp-contracts-states")
     cordapp "net.corda:corda-finance:$corda_release_version"
 }
 
@@ -103,8 +104,8 @@ task deployNodes(type: net.corda.plugins.Cordform, dependsOn: ['jar']) {
         p2pPort 10002
         rpcPort 10003
         cordapps = [
-                "$project.group:cordapp-contracts-states:$project.version",
-                "$project.group:cordapp:$project.version",
+                "$project.group:common:$project.version",
+                "$project.group:shared:$project.version",
                 "net.corda:corda-finance:$corda_release_version"
         ]
     }
@@ -115,7 +116,8 @@ task deployNodes(type: net.corda.plugins.Cordform, dependsOn: ['jar']) {
         rpcPort 10006
         webPort 10007
         cordapps = [
-                "$project.group:cordapp-contracts-states:$project.version",
+                "$project.group:common:$project.version",
+                "$project.group:shared:$project.version",
                 "$project.group:cordapp:$project.version",
                 "net.corda:corda-finance:$corda_release_version"
         ]
@@ -128,7 +130,6 @@ task deployNodes(type: net.corda.plugins.Cordform, dependsOn: ['jar']) {
         rpcPort 10009
         webPort 10010
         cordapps = [
-                "$project.group:cordapp-contracts-states:$project.version",
                 "$project.group:cordapp:$project.version",
                 "net.corda:corda-finance:$corda_release_version"
         ]

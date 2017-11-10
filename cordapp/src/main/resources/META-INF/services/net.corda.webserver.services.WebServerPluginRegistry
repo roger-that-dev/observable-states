@@ -1,2 +1,2 @@
-# Register here any CorDapp plugins extending from net.corda.webserver.services.WebServerPluginRegistry.
-com.template.TemplateWebPlugin
+# Register here any CorDapp plugins extending from net.corda.webserver.META-INF.WebServerPluginRegistry.
+net.corda.demos.crowdFunding.TemplateWebPlugin
