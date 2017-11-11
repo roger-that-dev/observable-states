@@ -7,6 +7,7 @@ import net.corda.core.transactions.LedgerTransaction
 class PledgeContract : Contract {
 
     companion object {
+        @JvmStatic
         val CONTRACT_REFERENCE = "net.corda.demos.crowdFunding.contracts.PledgeContract"
     }
 
@@ -14,6 +15,6 @@ class PledgeContract : Contract {
     class Cancel : TypeOnlyCommandData()
 
     override fun verify(tx: LedgerTransaction) {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+        // TODO
     }
 }

@@ -4,16 +4,16 @@ import co.paralleluniverse.fibers.Suspendable
 import net.corda.core.contracts.Amount
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.StateAndContract
+import net.corda.core.contracts.UniqueIdentifier
 import net.corda.core.flows.*
+import net.corda.core.identity.Party
 import net.corda.core.node.services.queryBy
 import net.corda.core.node.services.vault.QueryCriteria
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.transactions.TransactionBuilder
-import net.corda.core.utilities.unwrap
 import net.corda.demos.crowdFunding.contracts.CampaignContract
 import net.corda.demos.crowdFunding.contracts.PledgeContract
 import net.corda.demos.crowdFunding.structures.Campaign
-import net.corda.demos.crowdFunding.structures.CampaignReference
 import net.corda.demos.crowdFunding.structures.Pledge
 import java.util.*
 
@@ -21,32 +21,51 @@ object MakePledge {
 
     @StartableByRPC
     @InitiatingFlow
-    class Initiator(val amount: Amount<Currency>, val campaignReference: CampaignReference) : FlowLogic<Unit>() {
+    class Initiator(
+            private val amount: Amount<Currency>,
+            private val campaignReference: UniqueIdentifier
+    ) : FlowLogic<SignedTransaction>() {
 
         @Suspendable
-        override fun call() {
-            val notary = serviceHub.networkMapCache.notaryIdentities.first()
+        override fun call(): SignedTransaction {
+            // Pick a notary. Don't care which one.
+            val notary: Party = serviceHub.networkMapCache.notaryIdentities.first()
 
-            val pledge = Pledge(amount, ourIdentity, campaignReference)
+            // Get the Campaign state corresponding to the provided ID from our vault.
+            val queryCriteria = QueryCriteria.LinearStateQueryCriteria(linearId = listOf(campaignReference))
+            val campaignInputStateAndRef = serviceHub.vaultService.queryBy<Campaign>(queryCriteria).states.single()
+            val campaignState = campaignInputStateAndRef.state.data
 
-            val signers = listOf(ourIdentity.owningKey, campaignReference.manager.owningKey)
+            // Create a new pledge for the requested amount.
+            val pledgeOutputState = Pledge(amount, ourIdentity, campaignState.manager, campaignReference)
+
+            // Assemble the other transaction components. We need a Create Pledge command and a Campaign Pledge
+            // command, as well as the Campaign input + output and the new Pledge output state.
+            // Commands:
+            val signers = listOf(ourIdentity.owningKey, campaignState.manager.owningKey)
             val startCampaignCommand = Command(CampaignContract.Pledge(), signers)
             val createPledgeCommand = Command(PledgeContract.Create(), signers)
-            val newPledge = StateAndContract(pledge, PledgeContract.CONTRACT_REFERENCE)
 
+            // Output states:
+            val pledgeOutputStateAndContract = StateAndContract(pledgeOutputState, PledgeContract.CONTRACT_REFERENCE)
+            val newRaisedSoFar = campaignState.raisedSoFar + amount
+            val campaignOutputState = campaignState.copy(raisedSoFar = newRaisedSoFar)
+            val campaignOutputStateAndContract = StateAndContract(campaignOutputState, CampaignContract.CONTRACT_REFERENCE)
+
+            // Build the transaction.
             val utx = TransactionBuilder(notary = notary).withItems(
-                    newPledge,
+                    pledgeOutputStateAndContract,
+                    campaignOutputStateAndContract,
+                    campaignInputStateAndRef,
                     startCampaignCommand,
                     createPledgeCommand
             )
 
-            val session = initiateFlow(campaignReference.manager)
-            val ptx = session.sendAndReceive<SignedTransaction>(utx).unwrap { it }
-
-            val mySignature = serviceHub.createSignature(ptx)
-            val stx = ptx + mySignature
-
-            subFlow(FinalityFlow(stx))
+            // Sign, finalise and record the transaction.
+            val ptx = serviceHub.signInitialTransaction(utx)
+            val session = initiateFlow(campaignState.manager)
+            val stx = subFlow(CollectSignaturesFlow(ptx, setOf(session)))
+            return subFlow(FinalityFlow(stx))
         }
 
     }
@@ -56,26 +75,18 @@ object MakePledge {
 
         @Suspendable
         override fun call() {
-            val utx = otherSession.receive<TransactionBuilder>().unwrap { it }
+            val flow = object : SignTransactionFlow(otherSession) {
+                override fun checkTransaction(stx: SignedTransaction) {
+                    // TODO: Add some checks here.
+                }
+            }
 
-            val newPledge = utx.outputStates().map { it.data }.filterIsInstance<Pledge>().single()
-            val newPledgeId = newPledge.campaignReference.campaignId
+            // Wait for the transaction to be committed.
+            val stx = subFlow(flow)
+            val ftx = waitForLedgerCommit(stx.id)
 
-            // Get the latest Campaign state for this CampaignReference from the vault.
-            val queryCriteria = QueryCriteria.LinearStateQueryCriteria(linearId = listOf(newPledgeId))
-            val campaignInputStateAndRef = serviceHub.vaultService.queryBy<Campaign>(queryCriteria).states.single()
-
-            // Update the Campaign state with the new amount pledged and the pledger details.
-            val campaignInputState = campaignInputStateAndRef.state.data
-            val newRaisedSoFar = campaignInputState.raisedSoFar + newPledge.amount
-            val campaignOutputState = campaignInputState.copy(raisedSoFar = newRaisedSoFar)
-
-            utx.addInputState(campaignInputStateAndRef)
-            utx.addOutputState(campaignOutputState, CampaignContract.CONTRACT_REFERENCE)
-
-            val ptx = serviceHub.signInitialTransaction(utx)
-
-            otherSession.send(ptx)
+            // We then broadcast from the manager so we don't compromise the confidentiality of the pledging identities.
+            subFlow(BroadcastTransaction(ftx))
         }
 
     }

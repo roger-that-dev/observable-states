@@ -1,6 +1,7 @@
 package net.corda.demos.crowdFunding.contracts
 
 import net.corda.core.utilities.getOrThrow
+import net.corda.demos.crowdFunding.flows.MakePledge
 import net.corda.demos.crowdFunding.flows.StartCampaign
 import net.corda.demos.crowdFunding.structures.Campaign
 import net.corda.finance.POUNDS
@@ -8,9 +9,8 @@ import net.corda.node.internal.StartedNode
 import net.corda.testing.node.MockNetwork
 import org.junit.Before
 import org.junit.Test
-import kotlin.test.assertEquals
 
-class StartCampaignTests : CrowdFundingTest(numberOfNodes = 5) {
+class MakePledgeTests : CrowdFundingTest(numberOfNodes = 5) {
 
     lateinit var A: StartedNode<MockNetwork.MockNode>
     lateinit var B: StartedNode<MockNetwork.MockNode>
@@ -36,21 +36,18 @@ class StartCampaignTests : CrowdFundingTest(numberOfNodes = 5) {
         )
 
     @Test
-    fun `successfully start and broadcast campaign to all nodes`() {
-        val flow = StartCampaign(rogersCampaign)
-        val campaign = A.start(flow).getOrThrow()
+    fun `successfully make a pledge and broadcast the updated campaign state`() {
+        val startCampaignFlow = StartCampaign(rogersCampaign)
+        val campaign = A.start(startCampaignFlow).getOrThrow()
+
+        val campaignState = campaign.tx.outputs.single().data as Campaign
+        val campaignId = campaignState.linearId
+
+        val makePledgeFlow = MakePledge.Initiator(100.POUNDS, campaignId)
+        val stx = B.start(makePledgeFlow).getOrThrow()
+        println(stx.tx)
 
         net.waitQuiescent()
-
-        val campaignStateRef = campaign.tx.outRef<Campaign>(0).ref
-        val campaignState = campaign.tx.outputs.single()
-
-        val bCampaign = B.database.transaction { B.services.loadState(campaignStateRef) }
-        val cCampaign = C.database.transaction { C.services.loadState(campaignStateRef) }
-        val dCampaign = D.database.transaction { D.services.loadState(campaignStateRef) }
-        val eCampaign = E.database.transaction { E.services.loadState(campaignStateRef) }
-
-        assertEquals(1, setOf(campaignState, bCampaign, cCampaign, dCampaign, eCampaign).size)
     }
 
 }

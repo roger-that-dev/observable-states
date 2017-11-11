@@ -16,6 +16,6 @@ class CampaignContract : Contract {
     class Pledge : TypeOnlyCommandData()
 
     override fun verify(tx: LedgerTransaction) {
-
+        // TODO
     }
 }
