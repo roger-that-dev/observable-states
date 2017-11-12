@@ -8,7 +8,7 @@ class PledgeContract : Contract {
 
     companion object {
         @JvmStatic
-        val CONTRACT_REFERENCE = "net.corda.demos.crowdFunding.contracts.PledgeContract"
+        val CONTRACT_REF = "net.corda.demos.crowdFunding.contracts.PledgeContract"
     }
 
     class Create : TypeOnlyCommandData()

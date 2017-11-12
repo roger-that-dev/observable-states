@@ -4,6 +4,7 @@ import net.corda.core.concurrent.CordaFuture
 import net.corda.core.flows.FlowLogic
 import net.corda.core.identity.CordaX500Name
 import net.corda.core.identity.Party
+import net.corda.core.utilities.loggerFor
 import net.corda.demos.crowdFunding.flows.MakePledge
 import net.corda.demos.crowdFunding.flows.RecordTransactionAsObserver
 import net.corda.node.internal.StartedNode
@@ -12,6 +13,7 @@ import net.corda.testing.setCordappPackages
 import net.corda.testing.unsetCordappPackages
 import org.junit.After
 import org.junit.Before
+import org.slf4j.Logger
 import java.time.Instant
 
 abstract class CrowdFundingTest(val numberOfNodes: Int) {
@@ -39,7 +41,12 @@ abstract class CrowdFundingTest(val numberOfNodes: Int) {
         unsetCordappPackages()
     }
 
+    companion object {
+        val logger: Logger = loggerFor<CrowdFundingTest>()
+    }
+
     private fun calculateDeadlineInSeconds(interval: Long) = Instant.now().plusSeconds(interval)
+    protected val fiveSecondsFromNow: Instant get() = calculateDeadlineInSeconds(5L)
     protected val tenSecondsFromNow: Instant get() = calculateDeadlineInSeconds(10L)
     protected val oneMinuteFromNow: Instant get() = calculateDeadlineInSeconds(60L)
 

@@ -17,8 +17,17 @@ import net.corda.demos.crowdFunding.structures.Campaign
 import net.corda.demos.crowdFunding.structures.Pledge
 import java.util.*
 
+/**
+ * This pair of flows handles the pledging of money to a specific crowd funding campaign. A pledge is always initiated
+ * by the pledger. We can do it this way because the campaign manager broadcasts the campaign state to all parties
+ * on the crowd funding business network.
+ */
 object MakePledge {
 
+    /**
+     * Takes an amount of currency and a campaign reference then creates a new pledge state and updates the existing
+     * campaign state to reflect the new pledge.
+     */
     @StartableByRPC
     @InitiatingFlow
     class Initiator(
@@ -36,29 +45,37 @@ object MakePledge {
             val campaignInputStateAndRef = serviceHub.vaultService.queryBy<Campaign>(queryCriteria).states.single()
             val campaignState = campaignInputStateAndRef.state.data
 
-            // Create a new pledge for the requested amount.
-            val pledgeOutputState = Pledge(amount, ourIdentity, campaignState.manager, campaignReference)
-
-            // Assemble the other transaction components. We need a Create Pledge command and a Campaign Pledge
-            // command, as well as the Campaign input + output and the new Pledge output state.
+            // Assemble the other transaction components.
             // Commands:
+            // We need a Create Pledge command and a Campaign Pledge command, as well as the Campaign input + output and
+            // the new Pledge output state. The new pledge needs to be signed by the campaign manager and the pledger as
+            // it is a bi-lateral agreement. The pledge to campaign command only needs to be signed by the campaign
+            // manager. Either way, both the manager and the pledger need to sign this transaction.
             val signers = listOf(ourIdentity.owningKey, campaignState.manager.owningKey)
-            val startCampaignCommand = Command(CampaignContract.Pledge(), signers)
+            val pledgeToCampaignCommand = Command(CampaignContract.Pledge(), campaignState.manager.owningKey)
             val createPledgeCommand = Command(PledgeContract.Create(), signers)
 
             // Output states:
-            val pledgeOutputStateAndContract = StateAndContract(pledgeOutputState, PledgeContract.CONTRACT_REFERENCE)
+            // We create a new pledge state that reflects the requested amount, referencing the compaign Id we want to
+            // pledge money to. We then need to update the amount of money this campaign has raised and add the linear
+            // id of the new pledge to the campaign.
+            val pledgeOutputState = Pledge(amount, ourIdentity, campaignState.manager, campaignReference)
+            val pledgeOutputStateAndContract = StateAndContract(pledgeOutputState, PledgeContract.CONTRACT_REF)
             val newRaisedSoFar = campaignState.raisedSoFar + amount
-            val campaignOutputState = campaignState.copy(raisedSoFar = newRaisedSoFar)
-            val campaignOutputStateAndContract = StateAndContract(campaignOutputState, CampaignContract.CONTRACT_REFERENCE)
+            val campaignOutputState = campaignState.copy(
+                    raisedSoFar = newRaisedSoFar,
+                    pledges = campaignState.pledges + pledgeOutputState.linearId
+            )
+
+            val campaignOutputStateAndContract = StateAndContract(campaignOutputState, CampaignContract.CONTRACT_REF)
 
             // Build the transaction.
             val utx = TransactionBuilder(notary = notary).withItems(
-                    pledgeOutputStateAndContract,
-                    campaignOutputStateAndContract,
-                    campaignInputStateAndRef,
-                    startCampaignCommand,
-                    createPledgeCommand
+                    pledgeOutputStateAndContract, // Output
+                    campaignOutputStateAndContract, // Output
+                    campaignInputStateAndRef, // Input
+                    pledgeToCampaignCommand, // Command
+                    createPledgeCommand                 // Command
             )
 
             // Sign, finalise and record the transaction.
@@ -70,11 +87,16 @@ object MakePledge {
 
     }
 
+    /**
+     * This side is only run by the campaign manager who checks the proposed pledge then waits for the pledge
+     * transaction to be committed and broadcasts it to all the parties on the business network.
+     */
     @InitiatedBy(Initiator::class)
     class Responder(val otherSession: FlowSession) : FlowLogic<Unit>() {
 
         @Suspendable
         override fun call() {
+            // As the manager, we might want to do some checking of the pledge before we sign it.
             val flow = object : SignTransactionFlow(otherSession) {
                 override fun checkTransaction(stx: SignedTransaction) {
                     // TODO: Add some checks here.
@@ -85,7 +107,8 @@ object MakePledge {
             val stx = subFlow(flow)
             val ftx = waitForLedgerCommit(stx.id)
 
-            // We then broadcast from the manager so we don't compromise the confidentiality of the pledging identities.
+            // Once the transaction has been committed then we then broadcast from the manager so we don't compromise
+            // the confidentiality of the pledging identities, if they choose to be anonymous.
             subFlow(BroadcastTransaction(ftx))
         }
 

@@ -32,11 +32,11 @@ class MakePledgeTests : CrowdFundingTest(numberOfNodes = 5) {
                 name = "Roger's Campaign",
                 target = 1000.POUNDS,
                 manager = A.legalIdentity(),
-                deadline = tenSecondsFromNow
+                deadline = fiveSecondsFromNow
         )
 
     @Test
-    fun `successfully make a pledge and broadcast the updated campaign state`() {
+    fun `successfully make a pledge and broadcast the updated campaign state to all parties`() {
         val startCampaignFlow = StartCampaign(rogersCampaign)
         val campaign = A.start(startCampaignFlow).getOrThrow()
 
@@ -47,7 +47,7 @@ class MakePledgeTests : CrowdFundingTest(numberOfNodes = 5) {
         val stx = B.start(makePledgeFlow).getOrThrow()
         println(stx.tx)
 
-        net.waitQuiescent()
+        // TODO: Finish this test.
     }
 
 }
