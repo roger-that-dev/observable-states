@@ -27,15 +27,19 @@ class StartCampaign(private val newCampaign: Campaign) : FlowLogic<SignedTransac
     override fun call(): SignedTransaction {
         // Pick a notary. Don't care which one.
         val notary: Party = serviceHub.networkMapCache.notaryIdentities.first()
+
         // Assemble the transaction components.
         val startCommand = Command(CampaignContract.Start(), listOf(ourIdentity.owningKey))
         val outputState = StateAndContract(newCampaign, CampaignContract.CONTRACT_REF)
+
         // Build, sign and record the transaction.
         val utx = TransactionBuilder(notary = notary).withItems(outputState, startCommand)
         val stx = serviceHub.signInitialTransaction(utx)
         val ftx = subFlow(FinalityFlow(stx))
+
         // Broadcast this transaction to all parties on this business network.
         subFlow(BroadcastTransaction(ftx))
+
         return ftx
     }
 

@@ -80,4 +80,39 @@ class IntegrationTest : CrowdFundingTest(numberOfNodes = 5) {
         checkUpdatesAreCommitted(E, newCampaignId, campaignStateAfterFirstPledge)
     }
 
+    @Test
+    fun `start campaign, make a pledge, raise enough, then end the campaign with a failure`() {
+        // Issue cash to begin with.
+        selfIssueCash(B, 500.POUNDS)
+        selfIssueCash(C, 500.POUNDS)
+        // Start a campaign on PartyA.
+        val startCampaignFlow = StartCampaign(rogersCampaign)
+        val newCampaign = A.start(startCampaignFlow).getOrThrow()
+        val newCampaignState = newCampaign.tx.outputs.single().data as Campaign
+        val newCampaignId = newCampaignState.linearId
+
+        // B makes a pledge to A's campaign.
+        val bMakePledgeFlow = MakePledge.Initiator(500.POUNDS, newCampaignId)
+        val campaignAfterFirstPledge = B.start(bMakePledgeFlow).getOrThrow()
+        val campaignStateAfterFirstPledge = campaignAfterFirstPledge.tx.outputsOfType<Campaign>().single()
+        println(campaignStateAfterFirstPledge)
+
+        // We need this to avoid double spend exceptions.
+        Thread.sleep(1000)
+
+        // C makes a pledge to A's campaign.
+        val cMakePledgeFlow = MakePledge.Initiator(500.POUNDS, newCampaignId)
+        val campaignAfterSecondPledge = C.start(cMakePledgeFlow).getOrThrow()
+        val campaignStateAfterSecondPledge = campaignAfterSecondPledge.tx.outputsOfType<Campaign>().single()
+        println(campaignStateAfterSecondPledge)
+
+        A.database.transaction {
+            val (_, observable) = A.services.validatedTransactions.track()
+            observable.subscribe { logger.info(it.tx.toString()) }
+        }
+
+        net.waitQuiescent()
+
+    }
+
 }

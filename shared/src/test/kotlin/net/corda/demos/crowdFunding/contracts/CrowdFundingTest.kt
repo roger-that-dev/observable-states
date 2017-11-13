@@ -1,12 +1,18 @@
 package net.corda.demos.crowdFunding.contracts
 
 import net.corda.core.concurrent.CordaFuture
+import net.corda.core.contracts.Amount
 import net.corda.core.flows.FlowLogic
 import net.corda.core.identity.CordaX500Name
 import net.corda.core.identity.Party
+import net.corda.core.transactions.SignedTransaction
+import net.corda.core.utilities.OpaqueBytes
+import net.corda.core.utilities.getOrThrow
 import net.corda.core.utilities.loggerFor
+import net.corda.demos.crowdFunding.flows.EndCampaign
 import net.corda.demos.crowdFunding.flows.MakePledge
 import net.corda.demos.crowdFunding.flows.RecordTransactionAsObserver
+import net.corda.finance.flows.CashIssueFlow
 import net.corda.node.internal.StartedNode
 import net.corda.testing.node.MockNetwork
 import net.corda.testing.setCordappPackages
@@ -15,6 +21,7 @@ import org.junit.After
 import org.junit.Before
 import org.slf4j.Logger
 import java.time.Instant
+import java.util.*
 
 abstract class CrowdFundingTest(val numberOfNodes: Int) {
 
@@ -54,6 +61,7 @@ abstract class CrowdFundingTest(val numberOfNodes: Int) {
         val mockNode = node.internals
         mockNode.registerInitiatedFlow(RecordTransactionAsObserver::class.java)
         mockNode.registerInitiatedFlow(MakePledge.Responder::class.java)
+        mockNode.registerInitiatedFlow(EndCampaign.Responder::class.java)
     }
 
     protected fun createSomeNodes(numberOfNodes: Int = 2): List<StartedNode<MockNetwork.MockNode>> {
@@ -71,6 +79,16 @@ abstract class CrowdFundingTest(val numberOfNodes: Int) {
 
     fun StartedNode<MockNetwork.MockNode>.legalIdentity(): Party {
         return this.services.myInfo.legalIdentities.first()
+    }
+
+    protected fun selfIssueCash(party: StartedNode<MockNetwork.MockNode>,
+                                amount: Amount<Currency>): SignedTransaction {
+        val notary = party.services.networkMapCache.notaryIdentities.firstOrNull()
+                ?: throw IllegalStateException("Could not find a notary.")
+        val issueRef = OpaqueBytes.of(0)
+        val issueRequest = CashIssueFlow.IssueRequest(amount, issueRef, notary)
+        val flow = CashIssueFlow(issueRequest)
+        return party.services.startFlow(flow).resultFuture.getOrThrow().stx
     }
 
 }

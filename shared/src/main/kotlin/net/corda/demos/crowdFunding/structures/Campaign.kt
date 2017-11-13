@@ -19,6 +19,6 @@ data class Campaign(
         override val linearId: UniqueIdentifier = UniqueIdentifier()
 ) : LinearState, SchedulableState {
     override fun nextScheduledActivity(thisStateRef: StateRef, flowLogicRefFactory: FlowLogicRefFactory): ScheduledActivity? {
-        return ScheduledActivity(flowLogicRefFactory.create(EndCampaign::class.java, thisStateRef), deadline)
+        return ScheduledActivity(flowLogicRefFactory.create(EndCampaign.Initiator::class.java, thisStateRef), deadline)
     }
 }

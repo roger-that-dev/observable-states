@@ -82,6 +82,7 @@ object MakePledge {
             val ptx = serviceHub.signInitialTransaction(utx)
             val session = initiateFlow(campaignState.manager)
             val stx = subFlow(CollectSignaturesFlow(ptx, setOf(session)))
+            println(stx.tx)
             return subFlow(FinalityFlow(stx))
         }
 
