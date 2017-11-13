@@ -13,7 +13,8 @@ import net.corda.core.node.StatesToRecord
  * receiving node not being a participant in these states.
  *
  * WARNING: This feature still needs work. Storing fungible states, like cash when you are not the owner will cause
- * problems when using [generateSpend] as the vault currently assumes that all states in the vault are spendable.
+ * problems when using [generateSpend] as the vault currently assumes that all states in the vault are spendable. States
+ * you are only an observer of are NOT spendable!
  */
 @InitiatedBy(BroadcastTransaction::class)
 class RecordTransactionAsObserver(val otherSession: FlowSession) : FlowLogic<Unit>() {

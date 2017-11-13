@@ -9,6 +9,16 @@ observable states, it also uses the following features:
 * Queryable states and custom vault queries
 * Schedulable states
 
+## TODO
+
+1. Fix up the unit tests
+2. Add a Spring Reactive web server
+3. Finish the contract code
+4. Finish the README.md
+5. Check pledge currency
+6. Fill in the checkTransaction menthod of collect sigs flow
+7. The pledgers add the amounts - the manager needs to check it was done correctly
+
 ## How it works
 
 There are two types of parties:
@@ -65,18 +75,20 @@ As all nodes have the same CorDapp they all have the capability of setting up ca
    As with all the other transactions in this demo, these transactions will be broadcast to all other nodes on the 
    network.
 
-
-
 ## Assumptions
 
 1. If a node makes a pledge, they will have enough cash to fulfill the pledge when the campaign ends.
-2. Confidential pledger identities are adequate from a privacy perspective. We don't mind that 
-
-Welcome to the CorDapp template. The CorDapp template is a stubbed-out CorDapp 
-which you can use to bootstrap your own CorDapp projects.
-
-**This is the KOTLIN version of the CorDapp template. For the JAVA version click 
-[here](https://github.com/corda/cordapp-template-java/).**
+2. Confidential pledger identities are adequate from a privacy perspective. We don't mind that the cash and pledge 
+   states are shared to all nodes on the business network. If this an issue then we need to facilitate observable
+   states via the use of `FilteredTransaction`s.
+3. Each pledger can only make one pledger per campaign. They may update their pledge if they wish, though.
+4. The `Campaign` state only needs to be signed by the campaign manager.
+5. The `Pledge` states are bilateral agreements and are signed by the pledger and the campaign manager.
+6. The `Campaign` state is included in all create pledge transactions to make sure the amount raised is updated with the 
+   correct amount pledged. As such, if two pledgers try to pledge at the same time, one pledge will end up being a 
+   double spend. We assume this is OK. 
+7. Any node can start a `Campaign`.
+8. Nodes can pledge to multiple `Campaign`s.
 
 ## Pre-Requisites
 
@@ -97,13 +109,13 @@ Corda docsite.
 
 To get started, clone this repository with:
 
-     git clone https://github.com/corda/cordapp-template-kotlin.git
+     git clone https://github.com/roger3cev/corda-crowd-funding.git
 
 And change directories to the newly cloned repo:
 
-     cd cordapp-template-kotlin
+     cd corda-crowd-funding
 
-## Building the CorDapp template:
+## Building the CorDapp:
 
 **Unix:** 
 

@@ -32,7 +32,7 @@ class StartCampaignTests : CrowdFundingTest(numberOfNodes = 5) {
                 name = "Roger's Campaign",
                 target = 1000.POUNDS,
                 manager = A.legalIdentity(),
-                deadline = tenSecondsFromNow
+                deadline = oneSecondFromNow
         )
 
     @Test

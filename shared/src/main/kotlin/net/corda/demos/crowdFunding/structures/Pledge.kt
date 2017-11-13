@@ -8,8 +8,6 @@ import net.corda.core.identity.Party
 import net.corda.core.schemas.MappedSchema
 import net.corda.core.schemas.PersistentState
 import net.corda.core.schemas.QueryableState
-import net.corda.finance.POUNDS
-import net.corda.finance.contracts.asset.DUMMY_OBLIGATION_ISSUER
 import java.util.*
 import javax.persistence.Column
 import javax.persistence.Entity
@@ -31,8 +29,6 @@ data class Pledge(
         @Entity
         @Table(name = "pledges")
         class PledgeEntity(pledge: Pledge) : PersistentState() {
-            constructor() : this(Pledge(0.POUNDS, DUMMY_OBLIGATION_ISSUER, DUMMY_OBLIGATION_ISSUER, UniqueIdentifier()))
-
             @Column
             var currency: String = pledge.amount.token.toString()
             @Column

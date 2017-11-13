@@ -53,6 +53,7 @@ abstract class CrowdFundingTest(val numberOfNodes: Int) {
     }
 
     private fun calculateDeadlineInSeconds(interval: Long) = Instant.now().plusSeconds(interval)
+    protected val oneSecondFromNow: Instant get() = calculateDeadlineInSeconds(1L)
     protected val fiveSecondsFromNow: Instant get() = calculateDeadlineInSeconds(5L)
     protected val tenSecondsFromNow: Instant get() = calculateDeadlineInSeconds(10L)
     protected val oneMinuteFromNow: Instant get() = calculateDeadlineInSeconds(60L)

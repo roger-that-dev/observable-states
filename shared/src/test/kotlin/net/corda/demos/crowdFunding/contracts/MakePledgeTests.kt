@@ -43,9 +43,12 @@ class MakePledgeTests : CrowdFundingTest(numberOfNodes = 5) {
         val campaignState = campaign.tx.outputs.single().data as Campaign
         val campaignId = campaignState.linearId
 
+        println("New campaign started: \n$campaignState")
+
         val makePledgeFlow = MakePledge.Initiator(100.POUNDS, campaignId)
         val stx = B.start(makePledgeFlow).getOrThrow()
-        println(stx.tx)
+
+        println("PartyB pledges £100 to PartyA:\n ${stx.tx}")
 
         // TODO: Finish this test.
     }

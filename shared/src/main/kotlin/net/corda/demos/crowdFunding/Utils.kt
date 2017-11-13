@@ -11,14 +11,9 @@ import net.corda.demos.crowdFunding.structures.Campaign
 import net.corda.demos.crowdFunding.structures.Pledge
 import java.security.PublicKey
 
-/** Pick out all the pledges for this campaign. We need to cancel them whatever happens. */
+/** Pick out all the pledges for the specified campaign. */
 fun pledgersForCampaign(services: ServiceHub, campaign: Campaign): List<StateAndRef<Pledge>> {
     val generalCriteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
-
-    // Find our pledge. We have to do this as we have ALL the pledges for this campaign in our vault.
-    // This is because ReceiveTransactionFlow only allows us to record the WHOLE SignedTransaction and not a
-    // filtered transaction. In an ideal World, we would be able to send a filtered transaction that only shows
-    // the Campaign state and not the pledge states, so we would ONLY ever have our Pledge states in the vault.
     return builder {
         val campaignReference = Pledge.PledgeSchemaV1.PledgeEntity::campaign_reference.equal(campaign.linearId.id.toString())
         val customCriteria = QueryCriteria.VaultCustomQueryCriteria(campaignReference)

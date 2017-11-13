@@ -16,6 +16,7 @@ class PledgeContract : Contract {
     interface Commands : CommandData
     class Create : TypeOnlyCommandData(), Commands
     class Cancel : TypeOnlyCommandData(), Commands
+    class Update : TypeOnlyCommandData(), Commands // TODO Update pledge.
 
     override fun verify(tx: LedgerTransaction) {
         val command = tx.commands.requireSingleCommand<Commands>()
@@ -43,7 +44,7 @@ class PledgeContract : Contract {
         "You cannot pledge a zero amount." using (pledge.amount > Amount(0, pledge.amount.token))
 
         // Assert correct signers.
-        "The campaign must be signed by the manager only." using (signers == keysFromParticipants(pledge))
+        "The campaign must be signed by the manager and the pledger." using (signers == keysFromParticipants(pledge))
     }
 
     private fun verifyCancel(tx: LedgerTransaction, signers: Set<PublicKey>) = Unit // TODO

@@ -67,6 +67,7 @@ class IntegrationTest : CrowdFundingTest(numberOfNodes = 5) {
         val campaignAfterFirstPledge = B.start(makePledgeFlow).getOrThrow()
         val campaignStateAfterFirstPledge = campaignAfterFirstPledge.tx.outputsOfType<Campaign>().single()
 
+        // Wait for the campaign to end...
         net.waitQuiescent()
 
         checkUpdatesAreCommitted(A, newCampaignId, campaignStateAfterFirstPledge)
@@ -77,7 +78,7 @@ class IntegrationTest : CrowdFundingTest(numberOfNodes = 5) {
     }
 
     @Test
-    fun `start campaign, make a pledge, raise enough, then end the campaign with a failure`() {
+    fun `start campaign, make a pledge, raise enough, then end the campaign with a success`() {
         // Issue cash to begin with.
         selfIssueCash(B, 500.POUNDS)
         selfIssueCash(C, 500.POUNDS)

@@ -1,6 +1,7 @@
 package net.corda.demos.crowdFunding.flows
 
 import co.paralleluniverse.fibers.Suspendable
+import net.corda.confidential.IdentitySyncFlow
 import net.corda.core.contracts.Amount
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.StateAndContract
@@ -45,21 +46,26 @@ object MakePledge {
             val campaignInputStateAndRef = serviceHub.vaultService.queryBy<Campaign>(queryCriteria).states.single()
             val campaignState = campaignInputStateAndRef.state.data
 
+            // Generate a new key and cert, so the other pledgers don't know who we are.
+            val me = serviceHub.keyManagementService.freshKeyAndCert(
+                    ourIdentityAndCert,
+                    revocationEnabled = false
+            ).party.anonymise()
+
             // Assemble the other transaction components.
             // Commands:
             // We need a Create Pledge command and a Campaign Pledge command, as well as the Campaign input + output and
             // the new Pledge output state. The new pledge needs to be signed by the campaign manager and the pledger as
             // it is a bi-lateral agreement. The pledge to campaign command only needs to be signed by the campaign
             // manager. Either way, both the manager and the pledger need to sign this transaction.
-            val signers = listOf(ourIdentity.owningKey, campaignState.manager.owningKey)
-            val pledgeToCampaignCommand = Command(CampaignContract.AcceptPledge(), campaignState.manager.owningKey)
-            val createPledgeCommand = Command(PledgeContract.Create(), signers)
+            val acceptPledgeCommand = Command(CampaignContract.AcceptPledge(), campaignState.manager.owningKey)
+            val createPledgeCommand = Command(PledgeContract.Create(), listOf(me.owningKey, campaignState.manager.owningKey))
 
             // Output states:
             // We create a new pledge state that reflects the requested amount, referencing the campaign Id we want to
             // pledge money to. We then need to update the amount of money this campaign has raised and add the linear
             // id of the new pledge to the campaign.
-            val pledgeOutputState = Pledge(amount, ourIdentity, campaignState.manager, campaignReference)
+            val pledgeOutputState = Pledge(amount, me, campaignState.manager, campaignReference)
             val pledgeOutputStateAndContract = StateAndContract(pledgeOutputState, PledgeContract.CONTRACT_REF)
             val newRaisedSoFar = campaignState.raisedSoFar + amount
             val campaignOutputState = campaignState.copy(raisedSoFar = newRaisedSoFar)
@@ -71,15 +77,16 @@ object MakePledge {
                     pledgeOutputStateAndContract, // Output
                     campaignOutputStateAndContract, // Output
                     campaignInputStateAndRef, // Input
-                    pledgeToCampaignCommand, // Command
-                    createPledgeCommand                 // Command
+                    acceptPledgeCommand, // Command
+                    createPledgeCommand             // Command
             )
 
             // Sign, finalise and record the transaction.
-            val ptx = serviceHub.signInitialTransaction(utx)
+            val ptx = serviceHub.signInitialTransaction(builder = utx, signingPubKeys = listOf(me.owningKey))
             val session = initiateFlow(campaignState.manager)
-            val stx = subFlow(CollectSignaturesFlow(ptx, setOf(session)))
-            println(stx.tx)
+            // TODO: Fix the identities not syncing.
+            subFlow(IdentitySyncFlow.Send(otherSide = session, tx = ptx.tx))
+            val stx = subFlow(CollectSignaturesFlow(ptx, setOf(session), listOf(me.owningKey)))
             return subFlow(FinalityFlow(stx))
         }
 
@@ -94,6 +101,8 @@ object MakePledge {
 
         @Suspendable
         override fun call() {
+            subFlow(IdentitySyncFlow.Receive(otherSideSession = otherSession))
+
             // As the manager, we might want to do some checking of the pledge before we sign it.
             val flow = object : SignTransactionFlow(otherSession) {
                 override fun checkTransaction(stx: SignedTransaction) {

@@ -5,6 +5,7 @@ import net.corda.core.contracts.Command
 import net.corda.core.contracts.ContractState
 import net.corda.core.contracts.StateRef
 import net.corda.core.flows.*
+import net.corda.core.identity.AbstractParty
 import net.corda.core.identity.Party
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.transactions.TransactionBuilder
@@ -21,12 +22,8 @@ import net.corda.finance.contracts.asset.Cash
 /**
  * This pair of flows deals with ending the campaign, whether it successfully reaches its target or not. If the
  * campaign reaches the target then the manager sends a [CampaignResult.Success] object to all the pledgers, asking them
- * to provide cash states equals to the pledge they previous made. They send back the cash states and the manager
- * assembles the transaction which exits the campaign and pledge states and transfers the cash to the campaign manager.
- *
- *
- * TODO Deal with pledgers not having enough cash to make the pledge.
- * TODO Potentially this can be re-written using emcumbrances.
+ * to provide cash states equal to the pledge they previously made. They send back the cash states to the manager who
+ * assembles the transaction which exits the campaign and pledge states, and transfers the cash to the campaign manager.
  */
 object EndCampaign {
 
@@ -34,12 +31,25 @@ object EndCampaign {
     @InitiatingFlow
     class Initiator(private val stateRef: StateRef) : FlowLogic<SignedTransaction>() {
 
+        /**
+         * Sends a Success message to each one of the pledgers. In response, they send back cash states equal to the
+         * amount which they previously pledged. We also need to receive the stateRefs from them, so we can verify the
+         * transaction that we end up building.
+         * */
         @Suspendable
         fun requestPledgedCash(sessions: List<FlowSession>): CashStatesPayload {
             // Send a request to each pledger and get the dependency transactions as well.
             val cashStates = sessions.map { session ->
-                session.send(CampaignResult.Success(stateRef))
+                // Generate a new anonymous key for each payer.
+                val anonymousMe = serviceHub.keyManagementService.freshKeyAndCert(
+                        ourIdentityAndCert,
+                        revocationEnabled = false
+                ).party.anonymise()
+                // Send "Success" message.
+                session.send(CampaignResult.Success(stateRef, anonymousMe))
+                // Resolve transactions for the given StateRefs.
                 subFlow(ReceiveStateAndRefFlow<ContractState>(session))
+                // Receive the cash inputs, outputs and public keys.
                 session.receive<CashStatesPayload>().unwrap { it }
             }
 
@@ -74,6 +84,7 @@ object EndCampaign {
             return utx
         }
 
+        /** Do the common stuff then request the pledged cash. Once we have all the states, put them in the builder. */
         @Suspendable
         fun handleSuccess(campaign: Campaign, sessions: List<FlowSession>): TransactionBuilder {
             // Do the stuff we must do anyway.
@@ -122,6 +133,8 @@ object EndCampaign {
             val ptx = serviceHub.signInitialTransaction(utx)
             val stx = subFlow(CollectSignaturesFlow(ptx, sessions.map { it }))
             val ftx = subFlow(FinalityFlow(stx))
+
+            // Broadcast this transaction to all the other nodes on the business network.
             subFlow(BroadcastTransaction(ftx))
 
             return ftx
@@ -133,20 +146,26 @@ object EndCampaign {
     class Responder(val otherSession: FlowSession) : FlowLogic<Unit>() {
 
         @Suspendable
-        fun handleSuccess(campaignRef: StateRef) {
+        fun handleSuccess(campaignRef: StateRef, anonymousPayee: AbstractParty) {
             // Get our Pledge state for this campaign.
             val campaign = serviceHub.loadState(campaignRef).data as Campaign
             val results = pledgersForCampaign(serviceHub, campaign)
 
-            // Extract the amount.
-            val amount = results.single().state.data.amount
+            // Find our pledge. We have to do this as we have ALL the pledges for this campaign in our vault.
+            // This is because ReceiveTransactionFlow only allows us to record the WHOLE SignedTransaction and not a
+            // filtered transaction. In an ideal World, we would be able to send a filtered transaction that only shows
+            // the Campaign state and not the pledge states, so we would ONLY ever have our Pledge states in the vault.
+            // From a privacy perspective, this doesn't matter, though. As all the pledgers generate random keys.
+            val amount = results.single { (state) ->
+                serviceHub.identityService.wellKnownPartyFromAnonymous(state.data.pledger) == ourIdentity
+            }.state.data.amount
 
             // Using generate spend is the best way to get cash states to spend.
-            val (utx, _) = Cash.generateSpend(serviceHub, TransactionBuilder(), amount, otherSession.counterparty)
+            val (utx, _) = Cash.generateSpend(serviceHub, TransactionBuilder(), amount, anonymousPayee)
 
             // The Cash contract design won't allow more than one move command per transaction. As, we are collecting
             // cash from potentially multiple parties, we have pull out the items from the transaction builder so we
-            // can add them back to the OTHER transaction builder but with only one move command.
+            // can add them back to the OTHER transaction builder but with only ONE move command.
             val inputStateAndRefs = utx.inputStates().map { serviceHub.toStateAndRef<Cash.State>(it) }
             val outputStates = utx.outputStates().map { it.data as Cash.State }
             val signingKeys = utx.commands().flatMap { it.signers }
@@ -164,7 +183,7 @@ object EndCampaign {
             val campaignResult = otherSession.receive<CampaignResult>().unwrap { it }
 
             when (campaignResult) {
-                is CampaignResult.Success -> handleSuccess(campaignResult.campaignRef)
+                is CampaignResult.Success -> handleSuccess(campaignResult.campaignRef, campaignResult.anonymousPayee)
                 is CampaignResult.Failure -> return
             }
 
