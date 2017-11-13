@@ -2,8 +2,8 @@
 
 # Crowd Funding Demo
 
-This is a small demo that aims to demonstrate the new observable states feature in Version 2 of Corda. It also uses
-the following features:
+This is a small demo that aims to demonstrate the new observable states feature in Version 2 of Corda. As well as
+observable states, it also uses the following features:
 
 * Confidential identities
 * Queryable states and custom vault queries
@@ -20,14 +20,57 @@ As all nodes have the same CorDapp they all have the capability of setting up ca
 
 1. The demo begins with a node starting a new campaign. The node starting a new campaign becomes the manager for that
    campaign. The manager also needs to specify what the target amount to raise is, along with the campaign deadline and
-   a name for the campaign. The manager is the only participant in the campaign state, so it SHOULD only be stored in
-   the manager node's vault. However, as we use the observable states feature via the `BroadcastTransaction` and
-   `RecordTransactionAsObserver` flows all the other nodes on the network will store this campaign state in their
-   vaults too.
+   a name for the campaign. The manager is the only participant in the `Campaign` state, so it should *only* be stored 
+   in the manager node's vault. However, as we use the observable states feature via the `BroadcastTransaction` and
+   `RecordTransactionAsObserver` flows, all the other nodes on the network will store this campaign state in their
+   vaults too. The create new campaign transaction looks like this:
+   
+   ![Transaction for creating a new campaign.](images/create-campaign.png)
+   
+2. To make a pledge to a campaign, a node user must know the `linearId` of the campaign they wish to pledge to. As all 
+   the nodes on the network will receive new `Campaign` states, they can query their vault to enumerate all the 
+   campaigns, then pick the one they wish to pledge to. Making a pledge requires a node user to specify the `linearId` 
+   of the campaign they wish to pledge to as well as the amount they wish to pledge. The pledging node then constructs a 
+   transaction that contains the new `Pledge` state as an output as well as the `Campaign` state to be updated. As such
+   there is both a `Campaign` input and output. The transaction looks like this:
+   
+   ![Transaction for creating a new campaign.](images/create-pledge.png)
+   
+   The `CampaignContract` code ensures that `Campaign.raisedSoFar` property is updated in-line with the amount pledged. 
+   Note in the above diagram, as this is the only pledge so far in this scenario, the `Campaign` output state reflects 
+   the amount in the `Pledge` state.
+   
+   This as with the create campaign transaction covered above, this transaction is broadcast to all nodes on the 
+   network. It is worth noting, that currently, one can only observe a *whole* transaction as opposed to parts of a 
+   transaction. This is not necessarily an issue for privacy as the pledgers can create a confidential identity to use
+   when pledging, such that it is only known by the pledger and the campaign manager. The main complication with only
+   being able to store full transactions manifests itself when querying the vault - all the pledges that you have been
+   broadcast, can be returned 
+   
+3. The `Campaign` is actually a `SchedulableState`. When we create a new campaign, we are required to enter a deadline 
+   to which the campaign will run until. Once the deadline is reached, a flow is run to determine whether the campaign
+   was a success or failure.
+   
+   **Success:** The campaign ends successfully if the target amount is reached. In this case, an atomic transaction is 
+   produced to exit the `Campaign` state and all the `Pledge` states from the ledger as well as transfer the required
+   pledged amounts in cash from the pledgers to the campaign manger.
+   
+   ![Transaction for creating a new campaign.](images/campaign-end-success.png)
+   
+   **Failure:** The campaign ends in failure if the target is not reached. In this case, an atomic transaction is 
+   produced to exit the `Campaign` state and all the `Pledge` states from the ledger. The transaction looks like this:
+   
+   ![Transaction for creating a new campaign.](images/campaign-end-failure.png)
+   
+   As with all the other transactions in this demo, these transactions will be broadcast to all other nodes on the 
+   network.
+
+
 
 ## Assumptions
 
-1. It is assumed that
+1. If a node makes a pledge, they will have enough cash to fulfill the pledge when the campaign ends.
+2. Confidential pledger identities are adequate from a privacy perspective. We don't mind that 
 
 Welcome to the CorDapp template. The CorDapp template is a stubbed-out CorDapp 
 which you can use to bootstrap your own CorDapp projects.
