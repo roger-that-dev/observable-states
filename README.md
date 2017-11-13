@@ -1,6 +1,33 @@
 ![Corda](https://www.corda.net/wp-content/uploads/2016/11/fg005_corda_b.png)
 
-# CorDapp Template
+# Crowd Funding Demo
+
+This is a small demo that aims to demonstrate the new observable states feature in Version 2 of Corda. It also uses
+the following features:
+
+* Confidential identities
+* Queryable states and custom vault queries
+* Schedulable states
+
+## How it works
+
+There are two types of parties:
+
+* Campaign Managers
+* Pledgers
+
+As all nodes have the same CorDapp they all have the capability of setting up campaigns and pledging to other campaigns.
+
+1. The demo begins with a node starting a new campaign. The node starting a new campaign becomes the manager for that
+   campaign. The manager also needs to specify what the target amount to raise is, along with the campaign deadline and
+   a name for the campaign. The manager is the only participant in the campaign state, so it SHOULD only be stored in
+   the manager node's vault. However, as we use the observable states feature via the `BroadcastTransaction` and
+   `RecordTransactionAsObserver` flows all the other nodes on the network will store this campaign state in their
+   vaults too.
+
+## Assumptions
+
+1. It is assumed that
 
 Welcome to the CorDapp template. The CorDapp template is a stubbed-out CorDapp 
 which you can use to bootstrap your own CorDapp projects.

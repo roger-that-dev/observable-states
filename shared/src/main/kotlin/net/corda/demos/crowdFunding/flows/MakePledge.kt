@@ -52,20 +52,17 @@ object MakePledge {
             // it is a bi-lateral agreement. The pledge to campaign command only needs to be signed by the campaign
             // manager. Either way, both the manager and the pledger need to sign this transaction.
             val signers = listOf(ourIdentity.owningKey, campaignState.manager.owningKey)
-            val pledgeToCampaignCommand = Command(CampaignContract.Pledge(), campaignState.manager.owningKey)
+            val pledgeToCampaignCommand = Command(CampaignContract.AcceptPledge(), campaignState.manager.owningKey)
             val createPledgeCommand = Command(PledgeContract.Create(), signers)
 
             // Output states:
-            // We create a new pledge state that reflects the requested amount, referencing the compaign Id we want to
+            // We create a new pledge state that reflects the requested amount, referencing the campaign Id we want to
             // pledge money to. We then need to update the amount of money this campaign has raised and add the linear
             // id of the new pledge to the campaign.
             val pledgeOutputState = Pledge(amount, ourIdentity, campaignState.manager, campaignReference)
             val pledgeOutputStateAndContract = StateAndContract(pledgeOutputState, PledgeContract.CONTRACT_REF)
             val newRaisedSoFar = campaignState.raisedSoFar + amount
-            val campaignOutputState = campaignState.copy(
-                    raisedSoFar = newRaisedSoFar,
-                    pledges = campaignState.pledges + pledgeOutputState.linearId
-            )
+            val campaignOutputState = campaignState.copy(raisedSoFar = newRaisedSoFar)
 
             val campaignOutputStateAndContract = StateAndContract(campaignOutputState, CampaignContract.CONTRACT_REF)
 

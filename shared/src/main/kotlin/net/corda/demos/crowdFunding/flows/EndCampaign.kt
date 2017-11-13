@@ -11,13 +11,23 @@ import net.corda.core.transactions.TransactionBuilder
 import net.corda.core.utilities.unwrap
 import net.corda.demos.crowdFunding.contracts.CampaignContract
 import net.corda.demos.crowdFunding.contracts.PledgeContract
-import net.corda.demos.crowdFunding.pledgerStateAndRefs
+import net.corda.demos.crowdFunding.pledgersForCampaign
 import net.corda.demos.crowdFunding.structures.Campaign
 import net.corda.demos.crowdFunding.structures.CampaignResult
 import net.corda.demos.crowdFunding.structures.CashStatesPayload
 import net.corda.finance.contracts.asset.CASH_PROGRAM_ID
 import net.corda.finance.contracts.asset.Cash
 
+/**
+ * This pair of flows deals with ending the campaign, whether it successfully reaches its target or not. If the
+ * campaign reaches the target then the manager sends a [CampaignResult.Success] object to all the pledgers, asking them
+ * to provide cash states equals to the pledge they previous made. They send back the cash states and the manager
+ * assembles the transaction which exits the campaign and pledge states and transfers the cash to the campaign manager.
+ *
+ *
+ * TODO Deal with pledgers not having enough cash to make the pledge.
+ * TODO Potentially this can be re-written using emcumbrances.
+ */
 object EndCampaign {
 
     @SchedulableFlow
@@ -48,7 +58,7 @@ object EndCampaign {
             val utx = TransactionBuilder(notary = notary)
 
             // Create inputs.
-            val pledgerStateAndRefs = pledgerStateAndRefs(serviceHub, campaign)
+            val pledgerStateAndRefs = pledgersForCampaign(serviceHub, campaign)
             val campaignInputStateAndRef = serviceHub.toStateAndRef<Campaign>(stateRef)
 
             // Create commands.
@@ -86,7 +96,7 @@ object EndCampaign {
             val campaign = serviceHub.loadState(stateRef).data as Campaign
 
             // Get the pledges for this campaign. Remember, everyone has a copy of them.
-            val pledgerStateAndRefs = pledgerStateAndRefs(serviceHub, campaign)
+            val pledgersForCampaign = pledgersForCampaign(serviceHub, campaign)
 
             // As all nodes have the campaign state, all will try to start this flow. Abort for all but the manger.
             if (campaign.manager != ourIdentity) {
@@ -94,7 +104,7 @@ object EndCampaign {
             }
 
             // Create flow sessions for all pledgers.
-            val sessions = pledgerStateAndRefs.map { (state) ->
+            val sessions = pledgersForCampaign.map { (state) ->
                 val pledger = serviceHub.identityService.requireWellKnownPartyFromAnonymous(state.data.pledger)
                 initiateFlow(pledger)
             }
@@ -124,14 +134,12 @@ object EndCampaign {
 
         @Suspendable
         fun handleSuccess(campaignRef: StateRef) {
-            // Get the pledger states. One of them will be ours.
+            // Get our Pledge state for this campaign.
             val campaign = serviceHub.loadState(campaignRef).data as Campaign
-            val pledgerStates = pledgerStateAndRefs(serviceHub, campaign).map { it.state.data }
+            val results = pledgersForCampaign(serviceHub, campaign)
 
-            // Find our pledge. We have to do this as we have ALL the pledges for this campaign in our vault.
-            val amount = pledgerStates.single { pledge ->
-                serviceHub.identityService.requireWellKnownPartyFromAnonymous(pledge.pledger) == ourIdentity
-            }.amount
+            // Extract the amount.
+            val amount = results.single().state.data.amount
 
             // Using generate spend is the best way to get cash states to spend.
             val (utx, _) = Cash.generateSpend(serviceHub, TransactionBuilder(), amount, otherSession.counterparty)
@@ -161,9 +169,7 @@ object EndCampaign {
             }
 
             val flow = object : SignTransactionFlow(otherSession) {
-                override fun checkTransaction(stx: SignedTransaction) {
-                    // TODO
-                }
+                override fun checkTransaction(stx: SignedTransaction) = Unit // TODO
             }
 
             subFlow(flow)

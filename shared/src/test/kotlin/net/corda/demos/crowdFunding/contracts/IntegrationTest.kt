@@ -7,7 +7,6 @@ import net.corda.core.utilities.getOrThrow
 import net.corda.demos.crowdFunding.flows.MakePledge
 import net.corda.demos.crowdFunding.flows.StartCampaign
 import net.corda.demos.crowdFunding.structures.Campaign
-import net.corda.demos.crowdFunding.structures.Pledge
 import net.corda.finance.POUNDS
 import net.corda.node.internal.StartedNode
 import net.corda.testing.node.MockNetwork
@@ -52,9 +51,6 @@ class IntegrationTest : CrowdFundingTest(numberOfNodes = 5) {
 
             val campaignQuery = QueryCriteria.LinearStateQueryCriteria(linearId = listOf(campaignId))
             assertEquals(emptyList(), party.services.vaultService.queryBy<Campaign>(campaignQuery).states)
-
-            val pledgeQuery = QueryCriteria.LinearStateQueryCriteria(linearId = campaignState.pledges.toList())
-            assertEquals(emptyList(), party.services.vaultService.queryBy<Pledge>(pledgeQuery).states)
         }
     }
 

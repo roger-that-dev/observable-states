@@ -12,9 +12,8 @@ data class Campaign(
         val name: String,
         val manager: Party,
         val target: Amount<Currency>,
-        private val deadline: Instant,
+        val deadline: Instant,
         val raisedSoFar: Amount<Currency> = Amount(0, target.token),
-        val pledges: Set<UniqueIdentifier> = emptySet(),
         override val participants: List<AbstractParty> = listOf(manager),
         override val linearId: UniqueIdentifier = UniqueIdentifier()
 ) : LinearState, SchedulableState {
