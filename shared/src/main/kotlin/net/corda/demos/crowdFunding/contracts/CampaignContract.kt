@@ -6,7 +6,6 @@ import net.corda.demos.crowdFunding.keysFromParticipants
 import net.corda.demos.crowdFunding.structures.Campaign
 import net.corda.demos.crowdFunding.structures.Pledge
 import java.security.PublicKey
-import java.time.Instant
 
 class CampaignContract : Contract {
 
@@ -66,8 +65,9 @@ class CampaignContract : Contract {
         "The campaign reference (linearId) may not change when accepting a pledge." using (campaignInput.linearId == campaignOutput.linearId)
         "The campaign target may not change when accepting a pledge." using (campaignInput.target == campaignOutput.target)
 
-        // Assert other stuff.
-        "No pledges can be accepted after the deadline." using (Instant.now() < campaignOutput.deadline)
+        // Assert that we can't make any pledges after the deadline.
+        val pledgeTime = tx.timeWindow!!.midpoint!!
+        "No pledges can be accepted after the deadline." using (pledgeTime < campaignOutput.deadline)
 
         // Assert correct signers.
         "The campaign must be signed by the manager only." using (signers == keysFromParticipants(campaignOutput))

@@ -89,6 +89,7 @@ As all nodes have the same CorDapp they all have the capability of setting up ca
    double spend. We assume this is OK. 
 7. Any node can start a `Campaign`.
 8. Nodes can pledge to multiple `Campaign`s.
+9. After the campaign ends, it is OK to exit the `Campaign` state and all the `Pledge` states.
 
 ## Pre-Requisites
 

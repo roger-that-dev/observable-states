@@ -1,4 +1,3 @@
 include 'cordapp'
-include 'common'
 include 'shared'
 

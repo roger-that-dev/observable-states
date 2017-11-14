@@ -63,7 +63,7 @@ class IntegrationTest : CrowdFundingTest(numberOfNodes = 5) {
         val newCampaignId = newCampaignState.linearId
 
         // B makes a pledge to A's campaign.
-        val makePledgeFlow = MakePledge.Initiator(100.POUNDS, newCampaignId)
+        val makePledgeFlow = MakePledge.Initiator(100.POUNDS, newCampaignId, broadcastToObservers = true)
         val campaignAfterFirstPledge = B.start(makePledgeFlow).getOrThrow()
         val campaignStateAfterFirstPledge = campaignAfterFirstPledge.tx.outputsOfType<Campaign>().single()
 
@@ -89,7 +89,7 @@ class IntegrationTest : CrowdFundingTest(numberOfNodes = 5) {
         val newCampaignId = newCampaignState.linearId
 
         // B makes a pledge to A's campaign.
-        val bMakePledgeFlow = MakePledge.Initiator(500.POUNDS, newCampaignId)
+        val bMakePledgeFlow = MakePledge.Initiator(500.POUNDS, newCampaignId, broadcastToObservers = true)
         val campaignAfterFirstPledge = B.start(bMakePledgeFlow).getOrThrow()
         val campaignStateAfterFirstPledge = campaignAfterFirstPledge.tx.outputsOfType<Campaign>().single()
         println(campaignStateAfterFirstPledge)
@@ -98,7 +98,7 @@ class IntegrationTest : CrowdFundingTest(numberOfNodes = 5) {
         Thread.sleep(1000)
 
         // C makes a pledge to A's campaign.
-        val cMakePledgeFlow = MakePledge.Initiator(500.POUNDS, newCampaignId)
+        val cMakePledgeFlow = MakePledge.Initiator(500.POUNDS, newCampaignId, broadcastToObservers = true)
         val campaignAfterSecondPledge = C.start(cMakePledgeFlow).getOrThrow()
         val campaignStateAfterSecondPledge = campaignAfterSecondPledge.tx.outputsOfType<Campaign>().single()
         println(campaignStateAfterSecondPledge)

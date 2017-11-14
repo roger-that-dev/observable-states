@@ -12,10 +12,13 @@ import net.corda.core.node.services.queryBy
 import net.corda.core.node.services.vault.QueryCriteria
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.transactions.TransactionBuilder
+import net.corda.core.utilities.seconds
+import net.corda.core.utilities.unwrap
 import net.corda.demos.crowdFunding.contracts.CampaignContract
 import net.corda.demos.crowdFunding.contracts.PledgeContract
 import net.corda.demos.crowdFunding.structures.Campaign
 import net.corda.demos.crowdFunding.structures.Pledge
+import java.time.Instant
 import java.util.*
 
 /**
@@ -33,7 +36,8 @@ object MakePledge {
     @InitiatingFlow
     class Initiator(
             private val amount: Amount<Currency>,
-            private val campaignReference: UniqueIdentifier
+            private val campaignReference: UniqueIdentifier,
+            private val broadcastToObservers: Boolean
     ) : FlowLogic<SignedTransaction>() {
 
         @Suspendable
@@ -70,6 +74,7 @@ object MakePledge {
             val newRaisedSoFar = campaignState.raisedSoFar + amount
             val campaignOutputState = campaignState.copy(raisedSoFar = newRaisedSoFar)
 
+
             val campaignOutputStateAndContract = StateAndContract(campaignOutputState, CampaignContract.CONTRACT_REF)
 
             // Build the transaction.
@@ -78,16 +83,23 @@ object MakePledge {
                     campaignOutputStateAndContract, // Output
                     campaignInputStateAndRef, // Input
                     acceptPledgeCommand, // Command
-                    createPledgeCommand             // Command
+                    createPledgeCommand  // Command
             )
 
-            // Sign, finalise and record the transaction.
+            // Set the time for when this transaction happened.
+            utx.setTimeWindow(Instant.now(), 30.seconds)
+
+            // Sign, sync identities, finalise and record the transaction.
             val ptx = serviceHub.signInitialTransaction(builder = utx, signingPubKeys = listOf(me.owningKey))
             val session = initiateFlow(campaignState.manager)
-            // TODO: Fix the identities not syncing.
             subFlow(IdentitySyncFlow.Send(otherSide = session, tx = ptx.tx))
             val stx = subFlow(CollectSignaturesFlow(ptx, setOf(session), listOf(me.owningKey)))
-            return subFlow(FinalityFlow(stx))
+            val ftx = subFlow(FinalityFlow(stx))
+
+            // Let the campaign manager know whether we want to broadcast this update to observers, or not.
+            session.send(broadcastToObservers)
+
+            return ftx
         }
 
     }
@@ -110,13 +122,16 @@ object MakePledge {
                 }
             }
 
-            // Wait for the transaction to be committed.
             val stx = subFlow(flow)
-            val ftx = waitForLedgerCommit(stx.id)
 
             // Once the transaction has been committed then we then broadcast from the manager so we don't compromise
             // the confidentiality of the pledging identities, if they choose to be anonymous.
-            subFlow(BroadcastTransaction(ftx))
+            // Only do this if the pledger asks it to be done, though.
+            val broadcastToObservers = otherSession.receive<Boolean>().unwrap { it }
+            if (broadcastToObservers) {
+                val ftx = waitForLedgerCommit(stx.id)
+                subFlow(BroadcastTransaction(ftx))
+            }
         }
 
     }
