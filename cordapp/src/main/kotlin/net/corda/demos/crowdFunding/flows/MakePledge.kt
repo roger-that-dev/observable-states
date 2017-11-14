@@ -97,7 +97,7 @@ object MakePledge {
             val ftx = subFlow(FinalityFlow(stx))
 
             // Let the campaign manager know whether we want to broadcast this update to observers, or not.
-            session.send(broadcastToObservers)
+            session.sendAndReceive<Unit>(broadcastToObservers)
 
             return ftx
         }
@@ -117,9 +117,7 @@ object MakePledge {
 
             // As the manager, we might want to do some checking of the pledge before we sign it.
             val flow = object : SignTransactionFlow(otherSession) {
-                override fun checkTransaction(stx: SignedTransaction) {
-                    // TODO: Add some checks here.
-                }
+                override fun checkTransaction(stx: SignedTransaction) = Unit // TODO: Add some checks here.
             }
 
             val stx = subFlow(flow)
@@ -132,6 +130,9 @@ object MakePledge {
                 val ftx = waitForLedgerCommit(stx.id)
                 subFlow(BroadcastTransaction(ftx))
             }
+
+            // We want the other side to block or at least wait a while for the transaction to be broadcast.
+            otherSession.send(Unit)
         }
 
     }

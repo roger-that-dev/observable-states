@@ -1,0 +1,142 @@
+package net.corda.demos.crowdFunding.contracts
+
+import net.corda.core.contracts.*
+import net.corda.core.contracts.Requirements.using
+import net.corda.core.transactions.LedgerTransaction
+import net.corda.demos.crowdFunding.keysFromParticipants
+import net.corda.demos.crowdFunding.structures.Campaign
+import net.corda.demos.crowdFunding.structures.Pledge
+import net.corda.finance.contracts.asset.Cash
+import java.security.PublicKey
+import java.time.Instant
+
+class CampaignContract : Contract {
+
+    companion object {
+        @JvmStatic
+        val CONTRACT_REF = "net.corda.demos.crowdFunding.contracts.CampaignContract"
+    }
+
+    interface Commands : CommandData
+    class Start : TypeOnlyCommandData(), Commands
+    class End : TypeOnlyCommandData(), Commands
+    class AcceptPledge : TypeOnlyCommandData(), Commands
+
+    override fun verify(tx: LedgerTransaction) {
+        // TODO: We need to delineate between the signers for different commands.
+        val command = tx.commands.requireSingleCommand<Commands>()
+        val setOfSigners = command.signers.toSet()
+
+        when (command.value) {
+            is Start -> verifyStart(tx, setOfSigners)
+            is End -> verifyEnd(tx, setOfSigners)
+            is AcceptPledge -> verifyPledge(tx, setOfSigners)
+            else -> throw IllegalArgumentException("Unrecognised command.")
+        }
+    }
+
+    private fun verifyStart(tx: LedgerTransaction, signers: Set<PublicKey>) = requireThat {
+        // Assert we have the right amount and type of states.
+        "No inputs should be consumed when starting a campaign." using (tx.inputStates.isEmpty())
+        "Only one campaign state should be created when starting a campaign." using (tx.outputStates.size == 1)
+        val campaign = tx.outputStates.single() as Campaign
+
+        // Assert stuff over the state.
+        "A newly issued campaign must have a positive target." using
+                (campaign.target > Amount(0, campaign.target.token))
+        "A newly issued campaign must start with no pledges." using
+                (campaign.raisedSoFar == Amount(0, campaign.target.token))
+        "The deadline must be in the future." using (campaign.deadline > Instant.now())
+        "There must be a campaign name." using (campaign.name != "")
+
+        // Assert correct signers.
+        "The campaign must be signed by the manager only." using (signers == keysFromParticipants(campaign))
+    }
+
+    private fun verifyPledge(tx: LedgerTransaction, signers: Set<PublicKey>) = requireThat {
+        // Assert we have the right amount and type of states.
+        val campaignInput = tx.inputsOfType<Campaign>().single()
+        val campaignOutput = tx.outputsOfType<Campaign>().single()
+        val pledgeOutput = tx.outputsOfType<Pledge>().single()
+
+        // Assert stuff about the pledge in relation to the campaign state.
+        val changeInAmountRaised = campaignOutput.raisedSoFar - campaignInput.raisedSoFar
+        "The pledge must be for this campaign." using (pledgeOutput.campaignReference == campaignOutput.linearId)
+        "The campaign must be updated by the amount pledged." using (pledgeOutput.amount == changeInAmountRaised)
+
+        // Assert stuff cannot change in the campaign state.
+        "The campaign name may not change when accepting a pledge." using (campaignInput.name == campaignOutput.name)
+        "The campaign deadline may not change when accepting a pledge." using
+                (campaignInput.deadline == campaignOutput.deadline)
+        "The campaign manager may not change when accepting a pledge." using
+                (campaignInput.manager == campaignOutput.manager)
+        "The campaign reference (linearId) may not change when accepting a pledge." using
+                (campaignInput.linearId == campaignOutput.linearId)
+        "The campaign target may not change when accepting a pledge." using
+                (campaignInput.target == campaignOutput.target)
+
+        // Assert that we can't make any pledges after the deadline.
+        val pledgeTime = tx.timeWindow!!.midpoint!!
+        "No pledges can be accepted after the deadline." using (pledgeTime < campaignOutput.deadline)
+
+        // Assert correct signers.
+        "The campaign must be signed by the manager only." using (signers == keysFromParticipants(campaignOutput))
+    }
+
+    private fun verifyEnd(tx: LedgerTransaction, signers: Set<PublicKey>) = requireThat {
+        // Assert we have the right amount and type of states.
+        "Only one campaign can end per transaction." using (tx.inputsOfType<Campaign>().size == 1)
+        "There must be no campaign output states when ending a campaign." using (tx.outputsOfType<Campaign>().isEmpty())
+        "There must be no pledge output states when ending a campaign." using (tx.outputsOfType<Pledge>().isEmpty())
+
+        // Get references to all the pledge and campaign states. Might have multiple or zero pledges, who knows?
+        val campaignInput = tx.inputsOfType<Campaign>().single()
+        val pledgeInputs = tx.inputsOfType<Pledge>()
+
+        // Check the time is right.
+        "The deadline must have passed before the campaign can be ended." using (campaignInput.deadline < Instant.now())
+
+        // Check to see how many pledges we received.
+        val zero = Amount.zero(campaignInput.target.token)
+        val sumOfAllPledges = pledgeInputs.map { (amount) -> amount }.fold(zero) { acc, curr -> acc + curr }
+
+        // do different stuff depending on how many pledges we get.
+        when {
+            sumOfAllPledges == zero -> verifyNoPledges(tx)
+            sumOfAllPledges < campaignInput.target -> verifyMissedTarget(tx)
+            sumOfAllPledges >= campaignInput.target -> verifyHitTarget(tx, campaignInput, pledgeInputs)
+        }
+
+        // Check the campaign state is signed by the campaign manager.
+        "Ending campaign transactions must be signed by the campaign manager." using
+                (campaignInput.manager.owningKey in signers)
+    }
+
+    private fun verifyNoPledges(tx: LedgerTransaction) {
+        println("There are no pledges to collect.")
+        "No pledges were raised so there should be no pledge inputs." using (tx.inputsOfType<Pledge>().isEmpty())
+        "No pledges were raised so there should be no cash inputs." using (tx.inputsOfType<Cash.State>().isEmpty())
+        "No pledges were raised so there should be no cash outputs." using (tx.outputsOfType<Cash.State>().isEmpty())
+        "There are disallowed input state types in this transaction." using (tx.inputs.size == 1)
+        "There are disallowed output state types in this transaction." using (tx.outputs.isEmpty())
+    }
+
+    // TODO: This needs more work.
+    private fun verifyMissedTarget(tx: LedgerTransaction) {
+        println("We didn't collect enough pledges, so we shouldn't collect any cash.")
+        "Pledges were raised so there should be pledge inputs." using (tx.inputsOfType<Pledge>().isNotEmpty())
+        "Pledges were raised but we didn't hit the target so there should be no cash inputs." using
+                (tx.inputsOfType<Cash.State>().isEmpty())
+        "Pledges were raised but we didn't hit the target so there should be no cash outputs." using
+                (tx.outputsOfType<Cash.State>().isEmpty())
+    }
+
+    // TODO: This needs more work.
+    private fun verifyHitTarget(tx: LedgerTransaction, campaign: Campaign, pledges: List<Pledge>) {
+        println("We collected enough pledges so we should collect the cash.")
+        val cashOutputs = tx.outputsOfType<Cash.State>()
+        val cashPaidToManager = cashOutputs.filter { it.owner == campaign.manager }
+        // All the cash payments should match up with the pledges. No more, no less.
+        pledges.zip(cashPaidToManager) { pledge, cash -> pledge.amount == cash.amount.withoutIssuer() }.all { true }
+    }
+}

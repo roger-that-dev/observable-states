@@ -1,7 +1,6 @@
-package net.corda.demos.crowdFunding.contracts
+package net.corda.demos.crowdFunding.flows
 
 import net.corda.core.utilities.getOrThrow
-import net.corda.demos.crowdFunding.flows.StartCampaign
 import net.corda.demos.crowdFunding.structures.Campaign
 import net.corda.finance.POUNDS
 import net.corda.node.internal.StartedNode
@@ -27,7 +26,8 @@ class StartCampaignTests : CrowdFundingTest(numberOfNodes = 5) {
         E = nodes[4]
     }
 
-    private val rogersCampaign = Campaign(
+    private val rogersCampaign
+        get() = Campaign(
             name = "Roger's Campaign",
             target = 1000.POUNDS,
             manager = A.legalIdentity(),
@@ -45,7 +45,7 @@ class StartCampaignTests : CrowdFundingTest(numberOfNodes = 5) {
         val campaignState = campaign.tx.outputs.single()
 
         // Get the Campaign state from the observer node vaults.
-        val aCampaign = A.database.transaction { B.services.loadState(campaignStateRef) }
+        val aCampaign = A.database.transaction { A.services.loadState(campaignStateRef) }
         val bCampaign = B.database.transaction { B.services.loadState(campaignStateRef) }
         val cCampaign = C.database.transaction { C.services.loadState(campaignStateRef) }
         val dCampaign = D.database.transaction { D.services.loadState(campaignStateRef) }

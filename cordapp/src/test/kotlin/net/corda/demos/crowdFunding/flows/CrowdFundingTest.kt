@@ -1,4 +1,4 @@
-package net.corda.demos.crowdFunding.contracts
+package net.corda.demos.crowdFunding.flows
 
 import net.corda.core.concurrent.CordaFuture
 import net.corda.core.contracts.Amount
@@ -9,9 +9,6 @@ import net.corda.core.transactions.SignedTransaction
 import net.corda.core.utilities.OpaqueBytes
 import net.corda.core.utilities.getOrThrow
 import net.corda.core.utilities.loggerFor
-import net.corda.demos.crowdFunding.flows.EndCampaign
-import net.corda.demos.crowdFunding.flows.MakePledge
-import net.corda.demos.crowdFunding.flows.RecordTransactionAsObserver
 import net.corda.finance.flows.CashIssueFlow
 import net.corda.node.internal.StartedNode
 import net.corda.testing.node.MockNetwork

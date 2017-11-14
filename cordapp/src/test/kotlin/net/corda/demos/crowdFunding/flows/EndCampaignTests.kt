@@ -1,11 +1,9 @@
-package net.corda.demos.crowdFunding.contracts
+package net.corda.demos.crowdFunding.flows
 
 import net.corda.core.contracts.UniqueIdentifier
 import net.corda.core.node.services.queryBy
 import net.corda.core.node.services.vault.QueryCriteria
 import net.corda.core.utilities.getOrThrow
-import net.corda.demos.crowdFunding.flows.MakePledge
-import net.corda.demos.crowdFunding.flows.StartCampaign
 import net.corda.demos.crowdFunding.structures.Campaign
 import net.corda.finance.POUNDS
 import net.corda.node.internal.StartedNode
@@ -14,7 +12,7 @@ import org.junit.Before
 import org.junit.Test
 import kotlin.test.assertEquals
 
-class IntegrationTest : CrowdFundingTest(numberOfNodes = 5) {
+class EndCampaignTests : CrowdFundingTest(numberOfNodes = 5) {
 
     lateinit var A: StartedNode<MockNetwork.MockNode>
     lateinit var B: StartedNode<MockNetwork.MockNode>

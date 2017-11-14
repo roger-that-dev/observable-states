@@ -106,13 +106,13 @@ object EndCampaign {
             // Get the actual state from the ref.
             val campaign = serviceHub.loadState(stateRef).data as Campaign
 
-            // Get the pledges for this campaign. Remember, everyone has a copy of them.
-            val pledgersForCampaign = pledgersForCampaign(serviceHub, campaign)
-
             // As all nodes have the campaign state, all will try to start this flow. Abort for all but the manger.
             if (campaign.manager != ourIdentity) {
                 throw FlowException("Only the campaign manager can run this flow.")
             }
+
+            // Get the pledges for this campaign. Remember, everyone has a copy of them.
+            val pledgersForCampaign = pledgersForCampaign(serviceHub, campaign)
 
             // Create flow sessions for all pledgers.
             val sessions = pledgersForCampaign.map { (state) ->

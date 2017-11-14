@@ -1,6 +1,6 @@
 ![Corda](https://www.corda.net/wp-content/uploads/2016/11/fg005_corda_b.png)
 
-# Crowd Funding Demo
+# Crowd Funding Demo (Observable States)
 
 This is a small demo that aims to demonstrate the new observable states feature in Version 2 of Corda. As well as
 observable states, it also uses the following features:
@@ -90,6 +90,7 @@ As all nodes have the same CorDapp they all have the capability of setting up ca
 7. Any node can start a `Campaign`.
 8. Nodes can pledge to multiple `Campaign`s.
 9. After the campaign ends, it is OK to exit the `Campaign` state and all the `Pledge` states.
+10. Only campaign managers can cancel pledges and a pledge cancellation must be accompanied with a 
 
 ## Pre-Requisites
 
@@ -106,15 +107,33 @@ For more detailed information, see the
 [getting set up](https://docs.corda.net/getting-set-up.html) page on the
 Corda docsite.
 
-## Getting Set Up
+## Running the unit tests 
+
+Via gradle:
+
+**Unix:** 
+
+     ./gradlew clean test
+
+**Windows:**
+
+     gradlew.bat clean test
+    
+If you want to run the tests via IntelliJ then navigate to `cordapp/strc/test/kotlin/net.corda.demos.crowdFunding` in 
+the project explorer to see the unit test files. To run a test click the Green arrow in the left handle margin of the 
+editor.
+
+# Running the CorDapp
+
+## Clone the repo
 
 To get started, clone this repository with:
 
-     git clone https://github.com/roger3cev/corda-crowd-funding.git
+     git clone https://github.com/roger3cev/observable-states.git
 
 And change directories to the newly cloned repo:
 
-     cd corda-crowd-funding
+     cd observable-states
 
 ## Building the CorDapp:
 
@@ -142,11 +161,11 @@ run the nodes with:
 
 **Unix:**
 
-     ./runnodes --log-to-console --logging-level=DEBUG
+    ./runnodes --log-to-console --logging-level=INFO
 
 **Windows:**
 
-    runnodes.bat --log-to-console --logging-level=DEBUG
+    runnodes.bat --log-to-console --logging-level=INFO
 
 You should now have three Corda nodes running on your machine serving 
 the template.
@@ -158,81 +177,7 @@ in the console:
 
 ## Interacting with the CorDapp via HTTP
 
-The CorDapp defines a couple of HTTP API end-points and also serves some
-static web content. Initially, these return generic template responses.
-
-The nodes can be found using the following port numbers, defined in 
-`build.gradle`, as well as the `node.conf` file for each node found
-under `build/nodes/partyX`:
-
-     PartyA: localhost:10007
-     PartyB: localhost:10010
-
-As the nodes start up, they should tell you which host and port their
-embedded web server is running on. The API endpoints served are:
-
-     /api/template/templateGetEndpoint
-
-And the static web content is served from:
-
-     /web/template
-
-## Using the Example RPC Client
-
-The `ExampleClient.kt` file is a simple utility which uses the client
-RPC library to connect to a node and log its transaction activity.
-It will log any existing states and listen for any future states. To build 
-the client use the following Gradle task:
-
-     ./gradlew runTemplateClient
-
-To run the client:
-
-**Via IntelliJ:**
-
-Select the 'Run Template RPC Client'
-run configuration which, by default, connect to PartyA (RPC port 10006). Click the
-Green Arrow to run the client.
-
-**Via the command line:**
-
-Run the following Gradle task:
-
-     ./gradlew runTemplateClient
-     
-Note that the template rPC client won't output anything to the console as no state 
-objects are contained in either PartyA's or PartyB's vault.
-
-## Running the Nodes Across Multiple Machines
-
-The nodes can also be set up to communicate between separate machines on the 
-same subnet.
-
-After deploying the nodes, navigate to the build folder (`build/
-nodes`) and move some of the individual node folders to 
-separate machines on the same subnet (e.g. using a USB key). It is important 
-that no nodes - including the controller node - end up on more than one 
-machine. Each computer should also have a copy of `runnodes` and 
-`runnodes.bat`.
-
-For example, you may end up with the following layout:
-
-* Machine 1: `controller`, `partya`, `runnodes`, `runnodes.bat`
-* Machine 2: `partyb`, `partyc`, `runnodes`, `runnodes.bat`
-
-You must now edit the configuration file for each node, including the 
-controller. Open each node's config file (`[nodeName]/node.conf`), and make 
-the following changes:
-
-* Change the artemis address to the machine's ip address (e.g. 
-  `artemisAddress="10.18.0.166:10005"`)
-* Change the network map address to the ip address of the machine where the 
-  controller node is running (e.g. `networkMapAddress="10.18.0.166:10002"`) 
-  (please note that the controller will not have a network map address)
-
-Each machine should now run its nodes using `runnodes` or `runnodes.bat` 
-files. Once they are up and running, the nodes should be able to communicate 
-among themselves in the same way as when they were running on the same machine.
+To be added.
 
 ## Further reading
 
