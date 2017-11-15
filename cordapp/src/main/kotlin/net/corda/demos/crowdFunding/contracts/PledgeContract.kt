@@ -20,11 +20,11 @@ class PledgeContract : Contract {
     class Update : TypeOnlyCommandData(), Commands // TODO: Update pledge.
 
     override fun verify(tx: LedgerTransaction) {
-        // TODO: We need to delineate between the signers for different commands.
-        val command = tx.commands.requireSingleCommand<Commands>()
-        val setOfSigners = command.signers.toSet()
+        // We only need the pledge commands at this point to determine which part of the contract code to run.
+        val pledgeCommand = tx.commands.requireSingleCommand<Commands>()
+        val setOfSigners = pledgeCommand.signers.toSet()
 
-        when (command.value) {
+        when (pledgeCommand.value) {
             is Create -> verifyCreate(tx, setOfSigners)
             is Cancel -> verifyCancel(tx, setOfSigners)
             else -> throw IllegalArgumentException("Unrecognised command.")
@@ -33,8 +33,10 @@ class PledgeContract : Contract {
 
     private fun verifyCreate(tx: LedgerTransaction, signers: Set<PublicKey>) = requireThat {
         // Group pledges by campaign id.
-        val pledgeStates = tx.groupStates(Pledge::class.java, { it.campaignReference })
+        val pledgeStates = tx.groupStates(Pledge::class.java, { it.linearId })
         "You can only create one pledge at a time." using (pledgeStates.size == 1)
+        val campaignStates = tx.groupStates(Campaign::class.java, { it.linearId })
+        "A Pledge can only be created if there are campaign states present." using (campaignStates.isNotEmpty())
 
         // Assert we have the right amount and type of states.
         val pledgeStatesGroup = pledgeStates.single()
@@ -53,7 +55,7 @@ class PledgeContract : Contract {
         // Group pledges by linear id.
         val pledgeGroups = tx.groupStates(Pledge::class.java, { it.linearId })
 
-        // Check that there is a campaign state present.
+        // Check that there is a campaign state present. If there is then the campaign contract code will be run as well.
         "A Pledge can only be cancelled if there is a campaign input state present." using
                 (tx.inputsOfType<Campaign>().size == 1)
         val campaignInput = tx.inputsOfType<Campaign>().single()
@@ -64,9 +66,9 @@ class PledgeContract : Contract {
             "No outputs should be created when cancelling a pledge." using (outputs.isEmpty())
             "Only one campaign state should be created when starting a campaign." using (inputs.size == 1)
 
-            // Assert correct signers.
+            // Assert correct signers (Only the campaign manager can cancel a pledge).
             "The cancel pledge transaction must be signed by the campaign manager of the campaign the pledge is for." using
-                    (campaignInput.manager.owningKey in signers)
+                    (campaignInput.manager.owningKey == signers.single())
         }
 
     }

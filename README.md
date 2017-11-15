@@ -90,7 +90,8 @@ As all nodes have the same CorDapp they all have the capability of setting up ca
 7. Any node can start a `Campaign`.
 8. Nodes can pledge to multiple `Campaign`s.
 9. After the campaign ends, it is OK to exit the `Campaign` state and all the `Pledge` states.
-10. Only campaign managers can cancel pledges and a pledge cancellation must be accompanied with a 
+10. Only campaign managers can cancel pledges and a pledge cancellation must be accompanied with a campaign state and
+    campaign End command.
 
 ## Pre-Requisites
 

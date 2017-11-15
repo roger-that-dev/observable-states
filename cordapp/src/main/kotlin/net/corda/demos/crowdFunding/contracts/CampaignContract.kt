@@ -23,11 +23,10 @@ class CampaignContract : Contract {
     class AcceptPledge : TypeOnlyCommandData(), Commands
 
     override fun verify(tx: LedgerTransaction) {
-        // TODO: We need to delineate between the signers for different commands.
-        val command = tx.commands.requireSingleCommand<Commands>()
-        val setOfSigners = command.signers.toSet()
+        val campaignCommand = tx.commands.requireSingleCommand<Commands>()
+        val setOfSigners = campaignCommand.signers.toSet()
 
-        when (command.value) {
+        when (campaignCommand.value) {
             is Start -> verifyStart(tx, setOfSigners)
             is End -> verifyEnd(tx, setOfSigners)
             is AcceptPledge -> verifyPledge(tx, setOfSigners)
@@ -39,6 +38,7 @@ class CampaignContract : Contract {
         // Assert we have the right amount and type of states.
         "No inputs should be consumed when starting a campaign." using (tx.inputStates.isEmpty())
         "Only one campaign state should be created when starting a campaign." using (tx.outputStates.size == 1)
+        // There can only be one output state and it must be a Campaign state.
         val campaign = tx.outputStates.single() as Campaign
 
         // Assert stuff over the state.
@@ -55,6 +55,8 @@ class CampaignContract : Contract {
 
     private fun verifyPledge(tx: LedgerTransaction, signers: Set<PublicKey>) = requireThat {
         // Assert we have the right amount and type of states.
+        "The can only one input state in an accept pledge transaction." using (tx.inputStates.size == 1)
+        "There must be two output states in an accept pledge transaction." using (tx.outputStates.size == 2)
         val campaignInput = tx.inputsOfType<Campaign>().single()
         val campaignOutput = tx.outputsOfType<Campaign>().single()
         val pledgeOutput = tx.outputsOfType<Pledge>().single()
@@ -76,11 +78,12 @@ class CampaignContract : Contract {
                 (campaignInput.target == campaignOutput.target)
 
         // Assert that we can't make any pledges after the deadline.
-        val pledgeTime = tx.timeWindow!!.midpoint!!
-        "No pledges can be accepted after the deadline." using (pledgeTime < campaignOutput.deadline)
+        tx.timeWindow?.midpoint?.let {
+            "No pledges can be accepted after the deadline." using (it < campaignOutput.deadline)
+        } ?: throw IllegalArgumentException("A timestamp is required when pledging to a campaign.")
 
-        // Assert correct signers.
-        "The campaign must be signed by the manager only." using (signers == keysFromParticipants(campaignOutput))
+        // Assert correct signer.
+        "The campaign must be signed by the manager only." using (signers.single() == campaignOutput.manager.owningKey)
     }
 
     private fun verifyEnd(tx: LedgerTransaction, signers: Set<PublicKey>) = requireThat {
@@ -88,10 +91,13 @@ class CampaignContract : Contract {
         "Only one campaign can end per transaction." using (tx.inputsOfType<Campaign>().size == 1)
         "There must be no campaign output states when ending a campaign." using (tx.outputsOfType<Campaign>().isEmpty())
         "There must be no pledge output states when ending a campaign." using (tx.outputsOfType<Pledge>().isEmpty())
-
         // Get references to all the pledge and campaign states. Might have multiple or zero pledges, who knows?
         val campaignInput = tx.inputsOfType<Campaign>().single()
         val pledgeInputs = tx.inputsOfType<Pledge>()
+        val cashInputs = tx.inputsOfType<Cash.State>()
+        // Check there are states of no other types in this transaction.
+        val totalInputStates = 1 + pledgeInputs.size + cashInputs.size
+        "Un-required states have been added to this transaction." using (tx.inputs.size != totalInputStates)
 
         // Check the time is right.
         "The deadline must have passed before the campaign can be ended." using (campaignInput.deadline < Instant.now())

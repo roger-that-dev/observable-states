@@ -73,8 +73,6 @@ object MakePledge {
             val pledgeOutputStateAndContract = StateAndContract(pledgeOutputState, PledgeContract.CONTRACT_REF)
             val newRaisedSoFar = campaignState.raisedSoFar + amount
             val campaignOutputState = campaignState.copy(raisedSoFar = newRaisedSoFar)
-
-
             val campaignOutputStateAndContract = StateAndContract(campaignOutputState, CampaignContract.CONTRACT_REF)
 
             // Build the transaction.
