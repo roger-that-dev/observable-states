@@ -25,7 +25,6 @@ import java.math.BigInteger
 import java.security.KeyPair
 import java.time.Instant
 
-// TODO: Write more tests.
 class CampaignTests {
 
     private val issuer: Party = createParty("Issuer", 0)

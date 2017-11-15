@@ -51,12 +51,13 @@ class MakePledgeTests : CrowdFundingTest(numberOfNodes = 5) {
         val makePledgeFlow = MakePledge.Initiator(100.POUNDS, campaignId, broadcastToObservers = true)
         val acceptPledgeTransaction = B.start(makePledgeFlow).getOrThrow()
 
-        println("New campaign started")
-        println(createCampaignTransaction)
-        println(createCampaignTransaction.tx)
-        println("PartyB pledges £100 to PartyA")
-        println(acceptPledgeTransaction)
-        println(acceptPledgeTransaction.tx)
+        logger.info("New campaign started")
+        logger.info(createCampaignTransaction.toString())
+        logger.info(createCampaignTransaction.tx.toString())
+
+        logger.info("PartyB pledges £100 to PartyA")
+        logger.info(acceptPledgeTransaction.toString())
+        logger.info(acceptPledgeTransaction.tx.toString())
 
         //Extract the states from the transaction.
         val campaignStateRefAfterPledge = acceptPledgeTransaction.tx.outRefsOfType<Campaign>().single().ref
@@ -132,12 +133,13 @@ class MakePledgeTests : CrowdFundingTest(numberOfNodes = 5) {
         val makePledgeFlow = MakePledge.Initiator(100.POUNDS, campaignId, broadcastToObservers = false)
         val acceptPledgeTransaction = B.start(makePledgeFlow).getOrThrow()
 
-        println("New campaign started")
-        println(createCampaignTransaction)
-        println(createCampaignTransaction.tx)
-        println("PartyB pledges £100 to PartyA")
-        println(acceptPledgeTransaction)
-        println(acceptPledgeTransaction.tx)
+        logger.info("New campaign started")
+        logger.info(createCampaignTransaction.toString())
+        logger.info(createCampaignTransaction.tx.toString())
+
+        logger.info("PartyB pledges £100 to PartyA")
+        logger.info(acceptPledgeTransaction.toString())
+        logger.info(acceptPledgeTransaction.tx.toString())
 
         //Extract the states from the transaction.
         val campaignStateRefAfterPledge = acceptPledgeTransaction.tx.outRefsOfType<Campaign>().single().ref

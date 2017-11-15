@@ -86,11 +86,18 @@ class EndCampaignTests : CrowdFundingTest(numberOfNodes = 5) {
         val newCampaignState = newCampaign.tx.outputs.single().data as Campaign
         val newCampaignId = newCampaignState.linearId
 
+        logger.info("New campaign started")
+        logger.info(newCampaign.toString())
+        logger.info(newCampaign.tx.toString())
+
         // B makes a pledge to A's campaign.
         val bMakePledgeFlow = MakePledge.Initiator(500.POUNDS, newCampaignId, broadcastToObservers = true)
         val campaignAfterFirstPledge = B.start(bMakePledgeFlow).getOrThrow()
         val campaignStateAfterFirstPledge = campaignAfterFirstPledge.tx.outputsOfType<Campaign>().single()
-        println(campaignStateAfterFirstPledge)
+
+        logger.info("PartyB pledges £500 to PartyA")
+        logger.info(campaignAfterFirstPledge.toString())
+        logger.info(campaignAfterFirstPledge.tx.toString())
 
         // We need this to avoid double spend exceptions.
         Thread.sleep(1000)
@@ -99,7 +106,10 @@ class EndCampaignTests : CrowdFundingTest(numberOfNodes = 5) {
         val cMakePledgeFlow = MakePledge.Initiator(500.POUNDS, newCampaignId, broadcastToObservers = true)
         val campaignAfterSecondPledge = C.start(cMakePledgeFlow).getOrThrow()
         val campaignStateAfterSecondPledge = campaignAfterSecondPledge.tx.outputsOfType<Campaign>().single()
-        println(campaignStateAfterSecondPledge)
+
+        logger.info("PartyC pledges £500 to PartyA")
+        logger.info(campaignAfterSecondPledge.toString())
+        logger.info(campaignAfterSecondPledge.tx.toString())
 
         A.database.transaction {
             val (_, observable) = A.services.validatedTransactions.track()

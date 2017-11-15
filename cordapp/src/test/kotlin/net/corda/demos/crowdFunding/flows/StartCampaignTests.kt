@@ -54,13 +54,13 @@ class StartCampaignTests : CrowdFundingTest(numberOfNodes = 5) {
         // All the states should be equal.
         assertEquals(1, setOf(campaignState, aCampaign, bCampaign, cCampaign, dCampaign, eCampaign).size)
 
-        println("Even though PartyA is the only participant in the Campaign, all other parties should have a copy of it.")
-        println("The Campaign state does not include any information about the observers.")
-        println("PartyA: $campaignState")
-        println("PartyB: $bCampaign")
-        println("PartyC: $cCampaign")
-        println("PartyD: $dCampaign")
-        println("PartyE: $eCampaign")
+        logger.info("Even though PartyA is the only participant in the Campaign, all other parties should have a copy of it.")
+        logger.info("The Campaign state does not include any information about the observers.")
+        logger.info("PartyA: $campaignState")
+        logger.info("PartyB: $bCampaign")
+        logger.info("PartyC: $cCampaign")
+        logger.info("PartyD: $dCampaign")
+        logger.info("PartyE: $eCampaign")
 
         // We just shut down the nodes now - no need to wait for the nextScheduledActivity.
     }
