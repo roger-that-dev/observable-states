@@ -97,7 +97,7 @@ class CampaignContract : Contract {
         val cashInputs = tx.inputsOfType<Cash.State>()
         // Check there are states of no other types in this transaction.
         val totalInputStates = 1 + pledgeInputs.size + cashInputs.size
-        "Un-required states have been added to this transaction." using (tx.inputs.size != totalInputStates)
+        "Un-required states have been added to this transaction." using (tx.inputs.size == totalInputStates)
 
         // Check the time is right.
         "The deadline must have passed before the campaign can be ended." using (campaignInput.deadline < Instant.now())
@@ -119,7 +119,6 @@ class CampaignContract : Contract {
     }
 
     private fun verifyNoPledges(tx: LedgerTransaction) {
-        println("There are no pledges to collect.")
         "No pledges were raised so there should be no pledge inputs." using (tx.inputsOfType<Pledge>().isEmpty())
         "No pledges were raised so there should be no cash inputs." using (tx.inputsOfType<Cash.State>().isEmpty())
         "No pledges were raised so there should be no cash outputs." using (tx.outputsOfType<Cash.State>().isEmpty())
@@ -129,7 +128,6 @@ class CampaignContract : Contract {
 
     // TODO: This needs more work.
     private fun verifyMissedTarget(tx: LedgerTransaction) {
-        println("We didn't collect enough pledges, so we shouldn't collect any cash.")
         "Pledges were raised so there should be pledge inputs." using (tx.inputsOfType<Pledge>().isNotEmpty())
         "Pledges were raised but we didn't hit the target so there should be no cash inputs." using
                 (tx.inputsOfType<Cash.State>().isEmpty())
@@ -139,7 +137,6 @@ class CampaignContract : Contract {
 
     // TODO: This needs more work.
     private fun verifyHitTarget(tx: LedgerTransaction, campaign: Campaign, pledges: List<Pledge>) {
-        println("We collected enough pledges so we should collect the cash.")
         val cashOutputs = tx.outputsOfType<Cash.State>()
         val cashPaidToManager = cashOutputs.filter { it.owner == campaign.manager }
         // All the cash payments should match up with the pledges. No more, no less.

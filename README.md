@@ -11,13 +11,12 @@ observable states, it also uses the following features:
 
 ## TODO
 
-1. Fix up the unit tests
+1. Finish the contract and flow unit tests
 2. Add a Spring Reactive web server
-3. Finish the contract code
+3. Finish the campaign contract code
 4. Finish the README.md
-5. Check pledge currency
 6. Fill in the checkTransaction menthod of collect sigs flow
-7. The pledgers add the amounts - the manager needs to check it was done correctly
+7. The manager should check that the cash transactions send the cash to him. For this to work, we need to use the same key for each cash state
 
 ## How it works
 
