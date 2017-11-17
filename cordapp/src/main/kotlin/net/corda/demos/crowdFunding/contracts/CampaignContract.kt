@@ -10,6 +10,7 @@ import net.corda.finance.contracts.asset.Cash
 import java.security.PublicKey
 import java.time.Instant
 
+// TODO We need to improve this contract code so it works with confidential identities.
 class CampaignContract : Contract {
 
     companion object {
@@ -99,12 +100,14 @@ class CampaignContract : Contract {
         val totalInputStates = 1 + pledgeInputs.size + cashInputs.size
         "Un-required states have been added to this transaction." using (tx.inputs.size == totalInputStates)
 
-        // Check the time is right.
+        // Check we are not ending this campaign early.
         "The deadline must have passed before the campaign can be ended." using (campaignInput.deadline < Instant.now())
 
         // Check to see how many pledges we received.
         val zero = Amount.zero(campaignInput.target.token)
         val sumOfAllPledges = pledgeInputs.map { (amount) -> amount }.fold(zero) { acc, curr -> acc + curr }
+        "There is a mismatch between input pledge states and Campaign.raiseSoFar" using
+                (campaignInput.raisedSoFar == sumOfAllPledges)
 
         // do different stuff depending on how many pledges we get.
         when {
@@ -126,20 +129,28 @@ class CampaignContract : Contract {
         "There are disallowed output state types in this transaction." using (tx.outputs.isEmpty())
     }
 
-    // TODO: This needs more work.
     private fun verifyMissedTarget(tx: LedgerTransaction) {
-        "Pledges were raised so there should be pledge inputs." using (tx.inputsOfType<Pledge>().isNotEmpty())
+        val pledges = tx.inputsOfType<Pledge>()
+        "Pledges were raised so there should be pledge inputs." using (pledges.isNotEmpty())
         "Pledges were raised but we didn't hit the target so there should be no cash inputs." using
                 (tx.inputsOfType<Cash.State>().isEmpty())
         "Pledges were raised but we didn't hit the target so there should be no cash outputs." using
                 (tx.outputsOfType<Cash.State>().isEmpty())
+        "There are disallowed input state types in this transaction." using (pledges.size + 1 == tx.inputs.size)
+        "There are disallowed output state types in this transaction." using (tx.outputs.isEmpty())
     }
 
-    // TODO: This needs more work.
     private fun verifyHitTarget(tx: LedgerTransaction, campaign: Campaign, pledges: List<Pledge>) {
-        val cashOutputs = tx.outputsOfType<Cash.State>()
-        val cashPaidToManager = cashOutputs.filter { it.owner == campaign.manager }
+        "Pledges were raised so there should be pledge inputs." using (pledges.isNotEmpty())
+        val cashOutputs = tx.outputsOfType<Cash.State>().sortedBy { it.amount.withoutIssuer() }
+        val cashPaidToManager = cashOutputs.filter { it.owner == campaign.manager }.sortedBy { it.amount.withoutIssuer() }
+        "There must be a payment for each pledge." using (cashOutputs.size == cashPaidToManager.size)
+
         // All the cash payments should match up with the pledges. No more, no less.
-        pledges.zip(cashPaidToManager) { pledge, cash -> pledge.amount == cash.amount.withoutIssuer() }.all { true }
+        // Zip kills multiple birds with one stone.
+        // It ensures that number of output cash states paid to campaign manager == number of cancelled pledges.
+        val matchedPayments = pledges.zip(cashPaidToManager) { pledge, cash -> pledge.amount == cash.amount.withoutIssuer() }
+        "At least one of the cash payments is of an incorrect value. " using (matchedPayments.all { true })
+        // The cash contract will assure amount of input cash == output cash and verify the correct signers.
     }
 }

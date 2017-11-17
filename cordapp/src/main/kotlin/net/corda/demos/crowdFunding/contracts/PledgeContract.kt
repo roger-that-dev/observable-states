@@ -58,18 +58,19 @@ class PledgeContract : Contract {
         // Check that there is a campaign state present. If there is then the campaign contract code will be run as well.
         "A Pledge can only be cancelled if there is a campaign input state present." using
                 (tx.inputsOfType<Campaign>().size == 1)
-        val campaignInput = tx.inputsOfType<Campaign>().single()
+        val campaign = tx.inputsOfType<Campaign>().single()
 
         // Verify each pledge separately.
         pledgeGroups.forEach { (inputs, outputs) ->
             // Check there's only one output per group.
             "No outputs should be created when cancelling a pledge." using (outputs.isEmpty())
-            "Only one campaign state should be created when starting a campaign." using (inputs.size == 1)
+            "There should be no duplicate pledge states." using (inputs.size == 1)
+            val pledge = inputs.single()
+            "You are cancelling a pledge for a different campaign!" using (pledge.campaignReference == campaign.linearId)
 
             // Assert correct signers (Only the campaign manager can cancel a pledge).
             "The cancel pledge transaction must be signed by the campaign manager of the campaign the pledge is for." using
-                    (campaignInput.manager.owningKey == signers.single())
+                    (campaign.manager.owningKey == signers.single())
         }
-
     }
 }

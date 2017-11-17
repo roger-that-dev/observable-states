@@ -325,23 +325,80 @@ class CampaignTests {
 
     @Test
     fun `End campaign after failure with no pledges`() {
+        val pledge = Pledge(100.POUNDS, B, A, newValidCampaign.linearId)
+        val endedCampaign = newValidCampaign.copy(deadline = Instant.now().minusSeconds(1))
+
         ledger {
             transaction {
-                input(CampaignContract.CONTRACT_REF) { failedCampaignWithNoPledges }
+                input(CampaignContract.CONTRACT_REF) { endedCampaign }
                 command(*partyKeys(A).toTypedArray()) { CampaignContract.End() }
                 this.verifies()
+            }
+
+            transaction {
+                input(CampaignContract.CONTRACT_REF) { endedCampaign }
+                input(PledgeContract.CONTRACT_REF) { pledge }
+                command(*partyKeys(A).toTypedArray()) { CampaignContract.End() }
+                this.fails()
+            }
+        }
+    }
+
+    @Test
+    fun `End campaign after failure with some pledges`() {
+        val pledge = Pledge(100.POUNDS, B, A, newValidCampaign.linearId)
+        val endedCampaign = newValidCampaign.copy(deadline = Instant.now().minusSeconds(1))
+
+        ledger {
+            transaction {
+                input(CampaignContract.CONTRACT_REF) { endedCampaign.copy(raisedSoFar = 100.POUNDS) }
+                input(PledgeContract.CONTRACT_REF) { pledge }
+                command(*partyKeys(A).toTypedArray()) { CampaignContract.End() }
+                command(*partyKeys(A).toTypedArray()) { PledgeContract.Cancel() }
+                this.verifies()
+            }
+
+            transaction {
+                input(CampaignContract.CONTRACT_REF) { endedCampaign.copy(raisedSoFar = 500.POUNDS) }
+                input(PledgeContract.CONTRACT_REF) { pledge }
+                input(PledgeContract.CONTRACT_REF) { pledge.copy(linearId = UniqueIdentifier()) }
+                input(PledgeContract.CONTRACT_REF) { pledge.copy(linearId = UniqueIdentifier()) }
+                input(PledgeContract.CONTRACT_REF) { pledge.copy(linearId = UniqueIdentifier()) }
+                input(PledgeContract.CONTRACT_REF) { pledge.copy(linearId = UniqueIdentifier()) }
+                command(*partyKeys(A).toTypedArray()) { CampaignContract.End() }
+                command(*partyKeys(A).toTypedArray()) { PledgeContract.Cancel() }
+                this.verifies()
+            }
+
+            // Wrong campaign.
+            transaction {
+                input(CampaignContract.CONTRACT_REF) { endedCampaign.copy(raisedSoFar = 100.POUNDS) }
+                input(PledgeContract.CONTRACT_REF) { pledge.copy(campaignReference = UniqueIdentifier()) }
+                command(*partyKeys(A).toTypedArray()) { CampaignContract.End() }
+                command(*partyKeys(A).toTypedArray()) { PledgeContract.Cancel() }
+                this.fails()
+            }
+
+            // Raised vs pledge mismatch.
+            transaction {
+                input(CampaignContract.CONTRACT_REF) { endedCampaign.copy(raisedSoFar = 100.POUNDS) }
+                command(*partyKeys(A).toTypedArray()) { CampaignContract.End() }
+                command(*partyKeys(A).toTypedArray()) { PledgeContract.Cancel() }
+                this.fails()
             }
         }
     }
 
     @Test
     fun `End campaign in success`() {
+        val endedCampaign = newValidCampaign.copy(deadline = Instant.now().minusSeconds(1))
+
         ledger {
             transaction {
-                input(CampaignContract.CONTRACT_REF) { failedCampaignWithNoPledges }
-                input(PledgeContract.CONTRACT_REF) { Pledge(500.POUNDS, B, A, failedCampaignWithNoPledges.linearId) }
-                input(PledgeContract.CONTRACT_REF) { Pledge(300.POUNDS, C, A, failedCampaignWithNoPledges.linearId) }
-                input(PledgeContract.CONTRACT_REF) { Pledge(200.POUNDS, D, A, failedCampaignWithNoPledges.linearId) }
+                input(CampaignContract.CONTRACT_REF) { endedCampaign }
+                input(PledgeContract.CONTRACT_REF) { Pledge(500.POUNDS, B, A, endedCampaign.linearId) }
+                input(PledgeContract.CONTRACT_REF) { Pledge(200.POUNDS, D, A, endedCampaign.linearId) }
+                input(PledgeContract.CONTRACT_REF) { Pledge(300.POUNDS, C, A, endedCampaign.linearId) }
                 input(CASH_PROGRAM_ID) { Cash.State(defaultIssuer, 500.POUNDS, B) }
                 input(CASH_PROGRAM_ID) { Cash.State(defaultIssuer, 300.POUNDS, C) }
                 input(CASH_PROGRAM_ID) { Cash.State(defaultIssuer, 200.POUNDS, D) }

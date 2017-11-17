@@ -5,7 +5,6 @@ import net.corda.core.contracts.Command
 import net.corda.core.contracts.ContractState
 import net.corda.core.contracts.StateRef
 import net.corda.core.flows.*
-import net.corda.core.identity.AbstractParty
 import net.corda.core.identity.Party
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.transactions.TransactionBuilder
@@ -41,12 +40,8 @@ object EndCampaign {
             // Send a request to each pledger and get the dependency transactions as well.
             val cashStates = sessions.map { session ->
                 // Generate a new anonymous key for each payer.
-                val anonymousMe = serviceHub.keyManagementService.freshKeyAndCert(
-                        ourIdentityAndCert,
-                        revocationEnabled = false
-                ).party.anonymise()
                 // Send "Success" message.
-                session.send(CampaignResult.Success(stateRef, anonymousMe))
+                session.send(CampaignResult.Success(stateRef))
                 // Resolve transactions for the given StateRefs.
                 subFlow(ReceiveStateAndRefFlow<ContractState>(session))
                 // Receive the cash inputs, outputs and public keys.
@@ -146,7 +141,7 @@ object EndCampaign {
     class Responder(val otherSession: FlowSession) : FlowLogic<Unit>() {
 
         @Suspendable
-        fun handleSuccess(campaignRef: StateRef, anonymousPayee: AbstractParty) {
+        fun handleSuccess(campaignRef: StateRef) {
             // Get our Pledge state for this campaign.
             val campaign = serviceHub.loadState(campaignRef).data as Campaign
             val results = pledgersForCampaign(serviceHub, campaign)
@@ -161,7 +156,7 @@ object EndCampaign {
             }.state.data.amount
 
             // Using generate spend is the best way to get cash states to spend.
-            val (utx, _) = Cash.generateSpend(serviceHub, TransactionBuilder(), amount, anonymousPayee)
+            val (utx, _) = Cash.generateSpend(serviceHub, TransactionBuilder(), amount, campaign.manager)
 
             // The Cash contract design won't allow more than one move command per transaction. As, we are collecting
             // cash from potentially multiple parties, we have pull out the items from the transaction builder so we
@@ -183,7 +178,7 @@ object EndCampaign {
             val campaignResult = otherSession.receive<CampaignResult>().unwrap { it }
 
             when (campaignResult) {
-                is CampaignResult.Success -> handleSuccess(campaignResult.campaignRef, campaignResult.anonymousPayee)
+                is CampaignResult.Success -> handleSuccess(campaignResult.campaignRef)
                 is CampaignResult.Failure -> return
             }
 

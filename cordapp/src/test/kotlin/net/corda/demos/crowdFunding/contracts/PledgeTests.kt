@@ -1,5 +1,6 @@
 package net.corda.demos.crowdFunding.contracts
 
+import net.corda.core.contracts.UniqueIdentifier
 import net.corda.core.crypto.entropyToKeyPair
 import net.corda.core.identity.CordaX500Name
 import net.corda.core.identity.Party
@@ -72,7 +73,7 @@ class PledgeTests {
     )
 
     @Test
-    fun `Make a pledge tests`() {
+    fun `Make pledge tests`() {
         val defaultPledge = Pledge(100.POUNDS, B, A, newValidCampaign.linearId)
 
         ledger {
@@ -149,6 +150,61 @@ class PledgeTests {
                 command(*partyKeys(B).toTypedArray()) { PledgeContract.Create() }
                 command(*partyKeys(A).toTypedArray()) { CampaignContract.AcceptPledge() }
                 timeWindow(Instant.now(), 5.seconds)
+                this.fails()
+            }
+        }
+
+    }
+
+    @Test
+    fun `Cancel pledge tests`() {
+        val defaultPledge = Pledge(100.POUNDS, B, A, newValidCampaign.linearId)
+
+        val endedCampaign = newValidCampaign.copy(deadline = Instant.now().minusSeconds(1))
+
+        ledger {
+            // Valid make pledge transaction.
+            transaction {
+                input(CampaignContract.CONTRACT_REF) { endedCampaign }
+                input(PledgeContract.CONTRACT_REF) { defaultPledge }
+                command(*partyKeys(A).toTypedArray()) { PledgeContract.Cancel() }
+                command(*partyKeys(A).toTypedArray()) { CampaignContract.End() }
+                this.verifies()
+            }
+
+            // Has pledge outputs.
+            transaction {
+                input(CampaignContract.CONTRACT_REF) { endedCampaign }
+                input(PledgeContract.CONTRACT_REF) { defaultPledge }
+                output(PledgeContract.CONTRACT_REF) { defaultPledge }
+                command(*partyKeys(A, B).toTypedArray()) { PledgeContract.Cancel() }
+                command(*partyKeys(A).toTypedArray()) { CampaignContract.End() }
+                this.fails()
+            }
+
+            // Wrong public key.
+            transaction {
+                input(CampaignContract.CONTRACT_REF) { endedCampaign }
+                input(PledgeContract.CONTRACT_REF) { defaultPledge }
+                command(*partyKeys(B).toTypedArray()) { PledgeContract.Cancel() }
+                command(*partyKeys(A).toTypedArray()) { CampaignContract.End() }
+                this.fails()
+            }
+
+            // No campaign state present.
+            transaction {
+                input(PledgeContract.CONTRACT_REF) { defaultPledge }
+                command(*partyKeys(B).toTypedArray()) { PledgeContract.Cancel() }
+                command(*partyKeys(A).toTypedArray()) { CampaignContract.End() }
+                this.fails()
+            }
+
+            // Cancelling a pledge for a different campaign.
+            transaction {
+                input(CampaignContract.CONTRACT_REF) { endedCampaign }
+                input(PledgeContract.CONTRACT_REF) { defaultPledge.copy(campaignReference = UniqueIdentifier()) }
+                command(*partyKeys(A).toTypedArray()) { PledgeContract.Cancel() }
+                command(*partyKeys(A).toTypedArray()) { CampaignContract.End() }
                 this.fails()
             }
         }
